@@ -9,7 +9,7 @@ assignees: ""
 ## 📌 작업 개요
 
 <!-- 어떤 작업인지 한두 줄로 설명해주세요 -->
-<!-- 예: ESLint, Prettier 설정 추가 -->
+<!-- 예: uv 프로젝트 생성 및 비동기 패키지 설치 -->
 
 ## 💡 작업 이유
 
@@ -18,11 +18,11 @@ assignees: ""
 
 ## ✅ 작업 내용
 
-<!-- 예: ESLint 설치 / 규칙 파일(.eslintrc) 작성 / README에 사용법 추가 -->
+<!-- 예: uv init / uv add fastapi uvicorn sqlalchemy asyncpg / src/ 4계층 폴더와 __init__.py 생성 -->
 
 - [ ]
 
 ## ⚠️ 팀원이 알아야 할 점 (선택)
 
 <!-- 이 작업 후에 팀원이 해야 할 일이 있다면 적어주세요 -->
-<!-- 예: pull 받은 후 npm install 다시 실행해주세요 -->
+<!-- 예: pull 받은 후 uv sync 다시 실행해주세요 -->
