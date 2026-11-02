@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from shared.logger import get_logger
+from shared.core.logger import get_logger
 
 # .env 파일의 값을 환경 변수로 불러옴
 load_dotenv()
