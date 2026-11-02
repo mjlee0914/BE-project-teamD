@@ -29,12 +29,13 @@
 - [작업 흐름](#-작업-흐름)
 - [python & uv 규칙](#-python--uv-규칙)
 - [Docker 명령어](#-docker-명령어)
+- [DB 연결 문제 해결](#-db-연결-문제-해결)
 
 <br>
 
 ## 🚀 시작하기
 
-1. 저장소를 받고 패키지를 설치해요.
+1. 저장소 clone 및 패키지 설치
 
 ```bash
 git clone https://github.com/mjlee0914/BE-project-teamD.git
@@ -42,20 +43,20 @@ cd BE-project-teamD
 uv sync
 ```
 
-2. 환경 변수 파일을 만들어요. 값은 그대로 써도 돼요.
+2. 환경 변수 파일 생성 (값은 그대로 사용 가능)
 
 ```bash
 cp .env.example .env
 ```
 
-3. DB(PostgreSQL) 컨테이너를 띄워요. Docker Desktop이 켜져 있어야 해요.
+3. DB(PostgreSQL) 컨테이너 실행 (Docker Desktop이 켜져 있어야 함)
 
 ```bash
 docker compose up -d   # 컨테이너 생성 및 실행
 docker compose ps      # STATUS가 Up이면 정상
 ```
 
-4. 서버를 실행해요. (프로젝트 루트에서)
+4. 서버 실행 (프로젝트 루트에서)
 
 ```bash
 uv run uvicorn main:app --app-dir src --reload
@@ -67,7 +68,7 @@ uv run uvicorn main:app --app-dir src --reload
 
 **이슈 만들기 → 브랜치 만들기 → 작업·커밋 → PR 올리기 → 리뷰·머지**
 
-> ⚠️ `dev`에 바로 push하지 마세요. 항상 브랜치를 만들어 PR로 올려주세요.
+> ⚠️ `dev`에 바로 push 금지. 항상 브랜치를 만들어 PR로 올릴 것.
 
 ### 1. ISSUE 생성하기
 
@@ -75,7 +76,7 @@ uv run uvicorn main:app --app-dir src --reload
 
 ### 2. 브랜치 만들기
 
-`dev`를 최신으로 받은 다음, 이슈 종류와 번호로 브랜치를 만들어요.
+`dev`를 최신으로 받은 다음, 이슈 종류와 번호로 브랜치 생성
 
 ```bash
 git switch dev
@@ -98,26 +99,26 @@ git commit -m "feat: 이메일 로그인 API 연동"
 git push -u origin feat/12-email-login
 ```
 
-> 💡 커밋 메시지는 `.`처럼 비워두지 말고 무엇을 했는지 적어주세요. 나중에 기록을 볼 때 훨씬 편해요.
+> 💡 커밋 메시지는 `.`처럼 비워두지 말고 무엇을 했는지 적을 것. 나중에 기록을 볼 때 훨씬 편함.
 
 ### 4. PR 올리기
 
-1. push 직후 GitHub 저장소에 들어가면 노란 배너의 **Compare & pull request** 버튼이 보여요. 클릭하세요.
+1. push 직후 GitHub 저장소에 들어가면 노란 배너의 **Compare & pull request** 버튼 클릭
    - 버튼이 없으면 **Pull requests** 탭 → **New pull request** → `base: dev` ← `compare: 내 브랜치` 선택
-   - `base: dev` ← `compare: dev`이면 비교할 게 없어서 PR을 만들 수 없어요. compare를 꼭 내 브랜치로 바꾸세요.
-2. 본문에 자동으로 채워진 PR 템플릿을 항목별로 작성하세요.
+   - `base: dev` ← `compare: dev`이면 비교할 게 없어서 PR을 만들 수 없음. compare를 꼭 내 브랜치로 변경
+2. 본문에 자동으로 채워진 PR 템플릿을 항목별로 작성
 3. 오른쪽 사이드바에서 **Assignees(본인)**, **Reviewers(팀원)**를 지정하고 **Create pull request** 클릭
 
 #### PR 템플릿 작성 요령
 
 | 항목                              | 작성 방법                                                                                                |
 | --------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| 🔗 관련 이슈                      | `close #12`처럼 이슈 번호를 적어요. `dev`에 머지되면 이슈가 자동으로 닫혀요. 여러 개면 줄을 나눠 적어요. |
-| 📝 작업 내용                      | 무엇을 했는지 적어요. 예: 로그인 API 연동 / 입력값 검증 추가                                             |
-| 💡 고민한 점 / 리뷰 포인트 (선택) | 왜 이렇게 만들었는지, 리뷰어가 특히 봐줬으면 하는 부분을 적어요.                                         |
-| 🧪 확인 방법                      | 리뷰어가 따라 할 수 있게 적어요. 예: Swagger(`/docs`)에서 틀린 비밀번호로 로그인 → 401 응답 확인         |
-| 📷 스크린샷 (선택)                | Swagger 응답이나 터미널 로그를 드래그해서 붙여넣어요.                                                    |
-| ✔️ 체크리스트                     | 올리기 전에 하나씩 확인하고 `[ ]`를 `[x]`로 바꿔요.                                                      |
+| 🔗 관련 이슈                      | `close #12`처럼 이슈 번호 작성. `dev`에 머지되면 이슈가 자동으로 닫힘. 여러 개면 줄을 나눠 작성 |
+| 📝 작업 내용                      | 무엇을 했는지 작성. 예: 로그인 API 연동 / 입력값 검증 추가                                             |
+| 💡 고민한 점 / 리뷰 포인트 (선택) | 왜 이렇게 만들었는지, 리뷰어가 특히 봐줬으면 하는 부분 작성                                         |
+| 🧪 확인 방법                      | 리뷰어가 따라 할 수 있게 작성. 예: Swagger(`/docs`)에서 틀린 비밀번호로 로그인 → 401 응답 확인         |
+| 📷 스크린샷 (선택)                | Swagger 응답이나 터미널 로그를 드래그해서 붙여넣기                                                    |
+| ✔️ 체크리스트                     | 올리기 전에 하나씩 확인하고 `[ ]`를 `[x]`로 변경                                                      |
 
 #### 체크리스트
 
@@ -130,10 +131,10 @@ git push -u origin feat/12-email-login
 
 ### 5. 리뷰와 머지
 
-1. 리뷰어가 코멘트를 남기면 같은 브랜치에서 수정하고 다시 push하세요. PR에 자동으로 반영돼요.
-2. 승인(Approve)을 받으면 **Merge pull request**로 `dev`에 합쳐요.
-3. 머지 후 `close #번호`로 연결한 이슈가 자동으로 닫혔는지 확인해요.
-4. 다 쓴 브랜치는 정리해요.
+1. 리뷰어가 코멘트를 남기면 같은 브랜치에서 수정하고 다시 push. PR에 자동으로 반영됨.
+2. 승인(Approve)을 받으면 **Merge pull request**로 `dev`에 합치기
+3. 머지 후 `close #번호`로 연결한 이슈가 자동으로 닫혔는지 확인
+4. 다 쓴 브랜치 정리
 
 ```bash
 git switch dev
@@ -153,26 +154,73 @@ git branch -d feat/12-email-login # 로컬 브랜치 삭제
 | 커밋하면 안 되는 것               | `.venv/`, `__pycache__/`, `.env` (`.gitignore`에 등록)                           |
 | 새 폴더를 만들 때                 | 빈 `__init__.py` 함께 만들기 (`ModuleNotFoundError` 방지)                        |
 
-> ⚠️ `pip install`로 설치하지 마세요. `uv.lock`에 기록되지 않아서 다른 팀원 환경에서는 패키지가 없어요.
+> ⚠️ `pip install`로 설치 금지. `uv.lock`에 기록되지 않아서 다른 팀원 환경에는 패키지가 없음.
 
 <br>
 
 ## 🐳 Docker 명령어
 
-DB는 `docker-compose.yaml`로 각자 PC에 똑같이 띄워요. 접속 정보는 `.env.example`에 있어요.
+DB는 `docker-compose.yaml`로 각자 PC에 똑같이 띄움. 접속 정보는 `.env.example`에 있음.
 
 | 상황                       | 명령어                                             | 설명                                                    |
 | -------------------------- | -------------------------------------------------- | ------------------------------------------------------- |
-| DB 켜기                    | `docker compose up -d`                             | 컨테이너가 없으면 만들고, 있으면 다시 켜요              |
+| DB 켜기                    | `docker compose up -d`                             | 컨테이너가 없으면 만들고, 있으면 다시 켬                  |
 | 상태 확인                  | `docker compose ps`                                | STATUS가 `Up`이면 정상                                  |
 | 로그 보기                  | `docker compose logs -f db`                        | DB가 안 뜰 때 원인 확인 (`Ctrl + C`로 종료)             |
-| 잠깐 끄기                  | `docker compose stop`                              | 컨테이너만 멈춰요. `docker compose start`로 다시 켜요   |
-| 컨테이너 삭제              | `docker compose down`                              | 컨테이너는 지우지만 **데이터는 남아요**                 |
-| DB 초기화                  | `docker compose down -v`                           | 컨테이너와 **데이터까지 전부 삭제**해요                 |
+| 잠깐 끄기                  | `docker compose stop`                              | 컨테이너만 멈춤. `docker compose start`로 다시 켬     |
+| 컨테이너 삭제              | `docker compose down`                              | 컨테이너는 지우지만 **데이터는 남음**                   |
+| DB 초기화                  | `docker compose down -v`                           | 컨테이너와 **데이터까지 전부 삭제**                     |
 | DB 직접 접속               | `docker compose exec db psql -U admin -d karakpe`  | SQL로 테이블 확인 (`\dt` 테이블 목록, `\q` 종료)        |
 
-> 💡 데이터는 `pgdata` 볼륨에 저장돼서 컨테이너를 껐다 켜거나 `down` 해도 그대로 남아요.
+> 💡 데이터는 `pgdata` 볼륨에 저장돼서 컨테이너를 껐다 켜거나 `down` 해도 그대로 남음.
 >
-> ⚠️ `down -v`는 DB 데이터가 전부 지워져요. `docker-compose.yaml`의 유저·비밀번호·DB 이름을 바꿨을 때처럼 DB를 처음부터 다시 만들어야 할 때만 쓰세요.
+> ⚠️ `down -v`는 DB 데이터가 전부 지워짐. `docker-compose.yaml`의 유저·비밀번호·DB 이름을 바꿨을 때처럼 DB를 처음부터 다시 만들어야 할 때만 사용
 >
-> 💡 테이블은 Docker가 아니라 서버 코드(SQLAlchemy)가 만들어요. 컨테이너가 처음 뜨면 빈 `karakpe` DB만 있어요.
+> 💡 테이블은 Docker가 아니라 서버 코드(SQLAlchemy)가 만듦. 컨테이너가 처음 뜨면 빈 `karakpe` DB만 있음.
+
+<br>
+
+## 🩺 DB 연결 문제 해결
+
+### `Connection to localhost:5432 refused` 에러가 날 때
+
+서버 실행이나 DB 접속 시 아래 에러가 나는 경우임.
+
+```
+Connection to localhost:5432 refused. Check that the hostname and port are correct
+and that the postmaster is accepting TCP/IP connections.
+```
+
+**1. 컨테이너 상태와 PORTS 확인**
+
+```bash
+docker compose ps
+```
+
+| 보이는 상태                                     | 원인                                        | 해결                                          |
+| ----------------------------------------------- | ------------------------------------------- | --------------------------------------------- |
+| 목록이 비어 있음 / `Cannot connect to the Docker daemon` | 컨테이너가 꺼져 있거나 Docker Desktop이 꺼져 있음 | Docker Desktop 실행 → `docker compose up -d` |
+| STATUS `Up`인데 PORTS가 `5432/tcp`만 보임        | PC ↔ 컨테이너 포트 연결이 빠짐 (Docker Desktop 재시작 후 종종 발생) | 아래 2번 실행                               |
+| STATUS `Up`, PORTS `0.0.0.0:5432->5432/tcp`     | 정상                                        | `.env`의 `DATABASE_URL` 주소·포트 확인         |
+
+**2. 컨테이너 다시 만들기** (데이터는 볼륨에 남음)
+
+```bash
+docker compose down
+docker compose up -d
+docker compose ps   # PORTS에 0.0.0.0:5432->5432/tcp 가 보이면 해결
+```
+
+> ⚠️ 여기서 `down -v`를 쓰면 DB 데이터가 전부 지워짐. `-v` 없이 실행할 것.
+
+### `port is already allocated` 에러가 날 때
+
+`docker compose up -d` 할 때 이 에러가 나면, 다른 PostgreSQL(이전 수업용 컨테이너, 로컬 설치 PostgreSQL 등)이 이미 5432 포트를 쓰고 있는 것임.
+
+```bash
+docker ps   # 5432를 쓰는 다른 컨테이너 찾기
+docker stop <컨테이너 이름>   # 그 컨테이너 끄기
+docker compose up -d
+```
+
+> 💡 다른 PostgreSQL도 같이 켜 둬야 한다면 `docker-compose.yaml`의 포트를 `"5433:5432"`로 바꾸고, `.env`의 `DATABASE_URL`도 `localhost:5433`으로 바꿈. 이 변경은 본인 PC에만 하고 커밋하지 말 것.
