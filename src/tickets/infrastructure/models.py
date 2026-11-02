@@ -43,18 +43,18 @@ class Ticket(Base):
 
     #테이블 컬럼
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=BigInteger)
-    reservation_id: Mapped[BigInteger] = mapped_column(BigInteger, ForeignKey(reservations.id), index=True)
-    performance_id: Mapped[BigInteger]=mapped_column(BigInteger, ForeignKey(performances.id), index=True)
+    reservation_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(reservations.id), index=True)
+    performance_id: Mapped[int]=mapped_column(BigInteger, ForeignKey(performances.id), index=True)
 
     #enum에 적어둔 PENDING값 꺼내옴.PENDING의 (.value)값! 
     status: Mapped[str] = mapped_column(Text, default= TicketStatus.PENDING.value, index=True)
     #uuid1부터 uuid4가지 있는데 uuid4가 완전 무작위
-    ticket_code: Mapped[Uuid] = mapped_column(Uuid, unique = True, index=True, default=uuid.uuid4)
+    ticket_code: Mapped[Uuid] = mapped_column(Uuid, unique = True, index=True, default=Uuid.uuid4)
 
     #공연정보 스냅샷
     performance_start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     performance_end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    performance_title : Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    performance_title : Mapped[str] = mapped_column(Text)
 
     #Status 시각
     issued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

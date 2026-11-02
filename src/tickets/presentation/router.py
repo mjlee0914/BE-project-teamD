@@ -1,8 +1,13 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+
 
 router=APIRouter(prefix="/tickets", tags = ["tickests"])
 
 #티켓 생성
+@
 
 #내 티켓 조회
 
