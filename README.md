@@ -28,6 +28,7 @@
 - [시작하기](#-시작하기)
 - [작업 흐름](#-작업-흐름)
 - [python & uv 규칙](#-python--uv-규칙)
+- [ruff 사용법](#-ruff-사용법)
 - [Docker 명령어](#-docker-명령어)
 - [DB 연결 문제 해결](#-db-연결-문제-해결)
 
@@ -155,6 +156,45 @@ git branch -d feat/12-email-login # 로컬 브랜치 삭제
 | 새 폴더를 만들 때                 | 빈 `__init__.py` 함께 만들기 (`ModuleNotFoundError` 방지)                        |
 
 > ⚠️ `pip install`로 설치 금지. `uv.lock`에 기록되지 않아서 다른 팀원 환경에는 패키지가 없음.
+
+<br>
+
+## 🧹 ruff 사용법
+
+ruff는 코드 검사(lint)와 코드 정리(format)를 해주는 도구. 커밋 전에 **내가 작업한 파일·폴더만** 지정해서 실행할 것.
+
+### 명령어별 역할
+
+| 명령어                    | 역할                                                                         | 파일 수정 여부 |
+| ------------------------- | ---------------------------------------------------------------------------- | -------------- |
+| `ruff check`              | 안 쓰는 import·변수, 정의 안 된 이름 같은 실수를 찾아서 알려줌               | ❌ 보여주기만 함 |
+| `ruff check --fix`        | 찾은 문제 중 자동으로 고칠 수 있는 것(안 쓰는 import 삭제 등)을 고침          | ✅ 수정함       |
+| `ruff format`             | 들여쓰기, 띄어쓰기, 따옴표, 줄바꿈 등 코드 모양을 통일                       | ✅ 수정함       |
+| `ruff format --diff`      | format이 무엇을 바꿀지 미리 보여줌                                           | ❌ 보여주기만 함 |
+
+### 파일 지정
+
+```bash
+uv run ruff check src/users/presentation/router.py         # 검사
+uv run ruff check --fix src/users/presentation/router.py   # 자동 수정
+uv run ruff format src/users/presentation/router.py        # 코드 정리
+```
+
+### 폴더 지정
+
+폴더를 지정하면 그 안의 `.py` 파일 전부에 적용됨.
+
+```bash
+uv run ruff check src/users/          # users 폴더 전체 검사
+uv run ruff check --fix src/users/    # users 폴더 전체 자동 수정
+uv run ruff format src/users/         # users 폴더 전체 코드 정리
+```
+
+> 💡 여러 개를 한 번에 지정할 수도 있음: `uv run ruff check src/users/ src/shared/core/database.py`
+>
+> 💡 추천 순서: `check --fix` → `format` → 결과 확인 후 커밋
+>
+> ⚠️ `--fix`와 `format`은 파일을 직접 바꿈. 다른 팀원 파일까지 바뀌지 않도록 **내가 작업한 파일·폴더만 지정**할 것.
 
 <br>
 
