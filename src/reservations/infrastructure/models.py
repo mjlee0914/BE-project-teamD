@@ -1,20 +1,21 @@
-from enum import Enum
-from shared.core.models import Base
+
 from datetime import datetime
-from sqlalchemy import CheckConstraint, String, Integer, BigInteger, DateTime, ForeignKey, Enum as SQLEnum, func
+
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    func,
+)
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
+from reservations.domain.enums import ReservationStatus, TicketType
+from shared.core.models import Base
 
-class ReservationStatus(str, Enum):
-    PENDING = "PENDING"
-    CONFIRMED = "CONFIRMED"
-    CANCELED = "CANCELED"
-    EXPIRED = "EXPIRED"
-
-class TicketType(str, Enum):
-    SAT = "SAT"
-    SUN = "SUN"
-    BOTH = "BOTH"
 
 class Reservation(Base):
     """예매"""
