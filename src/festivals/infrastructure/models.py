@@ -1,9 +1,9 @@
 from datetime import date, datetime
-from sqlalchemy import  CheckConstraint, DateTime, String, BigInteger, Date, func, Text
+from sqlalchemy import  CheckConstraint, DateTime, String, BigInteger, Date, Text
 from sqlalchemy.orm import Mapped, mapped_column
-from shared.core.models import Base
+from shared.core.models import Base, DateTimeMixin
 
-class Festival(Base):
+class Festival(DateTimeMixin, Base):
     __tablename__ = "festivals"
 
     __table_args__ = (
@@ -32,29 +32,21 @@ class Festival(Base):
         Text,
         nullable=True,
     )
-    
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False
-    )
-    
-    updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        onupdate=func.now(), 
-        nullable=True,
-    )
 
     starts_on: Mapped[date] = mapped_column(
         Date,
-        nullable=False
+        nullable=False,
     )
 
     ends_on: Mapped[date] = mapped_column(
         Date,
-        nullable=False
+        nullable=False,
     )
 
+    canceled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
 
 
