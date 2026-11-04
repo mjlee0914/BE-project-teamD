@@ -29,7 +29,6 @@ from dataclasses import dataclass, field  # 엔티티 반복 코드 줄여주는
 from datetime import datetime
 from uuid import UUID, uuid4
 
-
 from tickets.domain.enums import TicketStatus
 
 
@@ -55,7 +54,9 @@ class Ticket:
     performance_id: int
     price: int
     performance_title: str
-    performance_start_at: datetime # 관례적으로 3인칭 단수 동사형을 따르는게 맞으나 db컬럼명이라 유지
+    performance_start_at: (
+        datetime  # 관례적으로 3인칭 단수 동사형을 따르는게 맞으나 db컬럼명이라 유지
+    )
     performance_end_at: datetime
     cancel_deadline_at: datetime
 
