@@ -1,8 +1,9 @@
 #SQLAlchemy가 이 클래스를 보고 SQL을 만들어줌 
 
 import enum
+import uuid
 from datetime import datetime
-from aqlalchemy import(
+from sqlalchemy import(
     BigInteger,
     CheckConstraint,
     DateTime,
@@ -10,10 +11,10 @@ from aqlalchemy import(
     Integer,
     Text,
     Uuid,
-    Func
+    func
 )
 from sqlalchemy.orm import Mapped, mapped_column
-from shared.core.database import Base
+from shared.core.models import Base
 
 
 #티켓 상태 상수
@@ -37,19 +38,18 @@ class Ticket(Base):
         CheckConstraint("price > 0", name ="check_ticket_price"),
         CheckConstraint("status <> 'CANCELED' OR canceled_at IS NOT NULL", name ="check_ticket_canceled_at"),
         CheckConstraint("performance_end_at > performance_start_at", name ="check_performance_time"),
-        CheckConstraint("status<>used_at OR used_at IS NOT NULL", name = "check_ticket_used_at"),
-        CheckConstraint("status<>  'Canceled' or canceled_at IS NOT NULL", name ="check_canceled_at")
+        CheckConstraint("status<> 'USED' OR used_at IS NOT NULL", name = "check_ticket_used_at"),
     )
 
     #테이블 컬럼
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=BigInteger)
-    reservation_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(reservations.id), index=True)
-    performance_id: Mapped[int]=mapped_column(BigInteger, ForeignKey(performances.id), index=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    reservation_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("reservations.id"), index=True)
+    performance_id: Mapped[int]=mapped_column(BigInteger, ForeignKey("performances.id"), index=True)
 
     #enum에 적어둔 PENDING값 꺼내옴.PENDING의 (.value)값! 
     status: Mapped[str] = mapped_column(Text, default= TicketStatus.PENDING.value, index=True)
     #uuid1부터 uuid4가지 있는데 uuid4가 완전 무작위
-    ticket_code: Mapped[Uuid] = mapped_column(Uuid, unique = True, index=True, default=Uuid.uuid4)
+    ticket_code: Mapped[uuid.UUID] = mapped_column(Uuid, unique = True, index=True, default=uuid.uuid4)
 
     #공연정보 스냅샷
     performance_start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -61,8 +61,8 @@ class Ticket(Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     canceled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     
-    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), onupdate=Func.now())
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=Func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     #티켓가격
     price: Mapped[int] = mapped_column(Integer)
