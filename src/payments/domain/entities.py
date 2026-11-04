@@ -1,13 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-
-
-class PaymentStatus(str, Enum):
-    READY = "READY"
-    PAID = "PAID"
-    FAILED = "FAILED"
-    CANCELED = "CANCELED"
+from payments.domain.enum import PaymentStatus
 
 
 @dataclass
