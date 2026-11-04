@@ -25,8 +25,8 @@ class Reservation(Base):
         CheckConstraint(  # 예매 수량은 0보다 커야 한다
             "quantity > 0", name="ck_reservations_quantity_positive"
         ),
-        CheckConstraint(  # 총 금액은 0보다 작을 수 없음
-            "total_price >= 0", name="ck_reservations_total_price_nonnegative"
+        CheckConstraint(  # 총 금액은 0보다 커야 함 (무료 공연 없음)
+            "total_price > 0", name="ck_reservations_total_price_positive"
         ),
         CheckConstraint(  # 할인 금액은 0보다 작을 수 없고 총 금액보다 작거나 같아야 함
             "discount_amount >= 0 AND discount_amount <= total_price",
@@ -102,6 +102,6 @@ class Reservation(Base):
         BigInteger, ForeignKey("users.id"), nullable=False, index=True
     )
 
-    performances_id: Mapped[int] = mapped_column(  # 예매한 공연
+    performance_id: Mapped[int] = mapped_column(  # 예매한 공연
         BigInteger, ForeignKey("performances.id"), nullable=False, index=True
     )

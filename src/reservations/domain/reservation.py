@@ -2,14 +2,14 @@
 요구 사항 정의
 
 [생성]
-1. 예매는 회차(performances_id), 사용자(user_id), 수량, 티켓 종류, 금액, 축제 이름·장소를 받아 생성한다.
+1. 예매는 회차(performance_id), 사용자(user_id), 수량, 티켓 종류, 금액, 축제 이름·장소를 받아 생성한다.
 2. 새 예매의 상태는 항상 PENDING(입금 대기)이다.
 3. 결제는 토스 가상계좌(무통장입금) 기준이며, 입금 기한(expires_at)은 생성 시각 + 24시간이다.
 4. 축제 이름·장소·금액은 예매 시점의 값을 그대로 저장한다(스냅샷). 이후 축제 정보가 바뀌어도 예매 내역은 바뀌지 않는다.
 
 [금액]
 5. 수량은 1장 이상이어야 한다.
-6. 총 금액은 0원 이상이어야 한다.
+6. 총 금액은 0원보다 커야 한다. (무료 공연 없음)
 7. 할인 금액은 0원 이상이고 총 금액을 넘을 수 없다. 할인이 없으면 0원이다.
 8. 최종 결제 금액은 총 금액 - 할인 금액이다.
 
@@ -21,8 +21,8 @@
     - CANCELED, EXPIRED 예매는 합산에서 제외한다.
 
 [상태 변경]
-13. 입금이 완료되면 PENDING → CONFIRMED로 바뀌고 confirmed_at을 기록한다.
-14. 입금 기한이 지나도록 입금하지 않으면 PENDING → EXPIRED로 바뀐다.
+13. 입금이 완료되면 PENDING → CONFIRMED로 바뀌고 confirmed_at을 기록한다. 입금 기한이 지났으면 승인할 수 없다.
+14. 입금 기한이 지나도록 입금하지 않으면 PENDING → EXPIRED로 바뀐다. 입금 기한 전에는 만료할 수 없다.
 15. 예매를 취소하면 CANCELED로 바뀌고 canceled_at을 기록한다.
     - PENDING 상태에서는 취소할 수 있다.
     - CONFIRMED 상태(입금 완료)의 취소 가능 여부와 환불 처리는 팀 확인 필요.
@@ -43,7 +43,7 @@ MAX_QUANTITY_PER_RESERVATION = 2  # 티켓 최대 수량
 
 @dataclass
 class Reservation:
-    performances_id: int  # 회차 아이디
+    performance_id: int  # 회차 아이디
     user_id: int  # 사용자 아이디
     quantity: int  # 티켓 수량
     ticket_type: TicketType  # 티켓 타입
@@ -73,10 +73,10 @@ class Reservation:
             raise ValueError(
                 f"티켓 수량은 2장 이하여야 합니다. [입력 : {self.quantity}, 최대 수량 : {MAX_QUANTITY_PER_RESERVATION}]"
             )
-        # 총 금액은 음수 일 수 없다.
-        if not 0 <= self.total_price:
+        # 총 금액은 0원보다 커야 한다. (무료 공연 없음)
+        if not 0 < self.total_price:
             raise ValueError(
-                f"총 금액은 음수 일 수 없습니다. (총 금액 : {self.total_price})"
+                f"총 금액은 0원보다 커야 합니다. (총 금액 : {self.total_price})"
             )
         # 할인 금액은 음수 일 수 없다.
         if not 0 <= self.discount_amount:
@@ -97,7 +97,7 @@ class Reservation:
     @classmethod
     def create(
         cls,
-        performances_id: int,
+        performance_id: int,
         user_id: int,
         ticket_type: TicketType,
         quantity: int,
@@ -114,7 +114,7 @@ class Reservation:
         final_price = total_price - discount_amount
 
         return cls(
-            performances_id=performances_id,
+            performance_id=performance_id,
             user_id=user_id,
             ticket_type=ticket_type,
             quantity=quantity,
@@ -132,14 +132,25 @@ class Reservation:
             raise ValueError(
                 f"예매 승인 시 상태는 PENDING 상태여야 합니다. [현재 상태 : {self.status}]"
             )
+        now = datetime.now(UTC)
+        # 입금 기한이 지난 예매는 승인할 수 없다.
+        if self.expires_at is not None and now > self.expires_at:
+            raise ValueError(
+                f"입금 기한이 지나 예매를 승인할 수 없습니다. [입금 기한 : {self.expires_at}]"
+            )
 
         self.status = ReservationStatus.CONFIRMED
-        self.confirmed_at = datetime.now(UTC)
+        self.confirmed_at = now
 
     def expire(self) -> None:  # 예매 만료 상태로 변경
         if self.status != ReservationStatus.PENDING:
             raise ValueError(
                 f"예매 만료 시 상태는 PENDING 상태여야 합니다. [현재 상태 : {self.status}]"
+            )
+        # 입금 기한이 지나지 않은 예매는 만료할 수 없다.
+        if self.expires_at is not None and datetime.now(UTC) <= self.expires_at:
+            raise ValueError(
+                f"입금 기한이 지나지 않아 예매를 만료할 수 없습니다. [입금 기한 : {self.expires_at}]"
             )
 
         self.status = ReservationStatus.EXPIRED
