@@ -1,11 +1,6 @@
-# 표준 라이브러리
-from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
-
-# 프로젝트 코드
-from reservations.domain.enums import ReservationStatus, TicketType
-
 """
+요구 사항 정의
+
 [생성]
 1. 예매는 회차(performances_id), 사용자(user_id), 수량, 티켓 종류, 금액, 축제 이름·장소를 받아 생성한다.
 2. 새 예매의 상태는 항상 PENDING(입금 대기)이다.
@@ -35,7 +30,15 @@ from reservations.domain.enums import ReservationStatus, TicketType
 17. 허용되지 않은 상태 변경을 시도하면 도메인 오류가 발생한다.
 """
 
-DEPOSIT_EXPIRE_HOURS = 24
+# 표준 라이브러리
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+
+# 프로젝트 코드
+from reservations.domain.enums import ReservationStatus, TicketType
+
+DEPOSIT_EXPIRE_HOURS = 24  # 예매 대기 시간
+MAX_QUANTITY_PER_RESERVATION = 2  # 티켓 최대 수량
 
 
 @dataclass
@@ -59,6 +62,38 @@ class Reservation:
     canceled_at: datetime | None = None  # 예매 취소 시간
     updated_at: datetime | None = None  # 예매 수정 시간
 
+    def __post_init__(self) -> None:  # 데이터 검증
+        # 티켓 수량은 1장 이상이어야 한다.
+        if not 1 <= self.quantity:
+            raise ValueError(
+                f"티켓 수량은 1장 이상이여야 합니다. [입력 : {self.quantity}]"
+            )
+        # 티켓 수량은 MAX_QUANTITY_PER_RESERVATION 이하여야 한다.
+        if not MAX_QUANTITY_PER_RESERVATION >= self.quantity:
+            raise ValueError(
+                f"티켓 수량은 2장 이하여야 합니다. [입력 : {self.quantity}, 최대 수량 : {MAX_QUANTITY_PER_RESERVATION}]"
+            )
+        # 총 금액은 음수 일 수 없다.
+        if not 0 <= self.total_price:
+            raise ValueError(
+                f"총 금액은 음수 일 수 없습니다. (총 금액 : {self.total_price})"
+            )
+        # 할인 금액은 음수 일 수 없다.
+        if not 0 <= self.discount_amount:
+            raise ValueError(
+                f"할인 금액은 음수 일 수 없습니다. (할인 금액 : {self.discount_amount})"
+            )
+        # 할인 금액은 총 금액보다 클 수 없다.
+        if not self.discount_amount <= self.total_price:
+            raise ValueError(
+                f"할인 금액은 총 금액보다 클 수 없습니다. (총 금액 : {self.total_price}, 할인 금액 : {self.discount_amount})"
+            )
+        # 최종 결제 금액은 총 금액 - 할인 금액 이여야 한다.
+        if self.final_price != (self.total_price - self.discount_amount):
+            raise ValueError(
+                f"최종 결제 금액은 총 금액 - 할인 금액과 같아야 합니다. (최종 결제 금액 : {self.final_price}, 총 금액 - 할인 금액 : {self.total_price - self.discount_amount})"
+            )
+
     @classmethod
     def create(
         cls,
@@ -71,11 +106,13 @@ class Reservation:
         venue: str,  # 스냅샷
         discount_amount: int = 0,
     ) -> "Reservation":
+
         now = datetime.now(UTC)
         created_at = now
         expires_at = now + timedelta(hours=DEPOSIT_EXPIRE_HOURS)
         total_price = unit_price * quantity
         final_price = total_price - discount_amount
+
         return cls(
             performances_id=performances_id,
             user_id=user_id,
@@ -89,3 +126,29 @@ class Reservation:
             total_price=total_price,
             final_price=final_price,
         )
+
+    def confirm(self) -> None:  # 예매 승인 상태로 변경, 예매 승인 시간 추가
+        if self.status != ReservationStatus.PENDING:
+            raise ValueError(
+                f"예매 승인 시 상태는 PENDING 상태여야 합니다. [현재 상태 : {self.status}]"
+            )
+
+        self.status = ReservationStatus.CONFIRMED
+        self.confirmed_at = datetime.now(UTC)
+
+    def expire(self) -> None:  # 예매 만료 상태로 변경
+        if self.status != ReservationStatus.PENDING:
+            raise ValueError(
+                f"예매 만료 시 상태는 PENDING 상태여야 합니다. [현재 상태 : {self.status}]"
+            )
+
+        self.status = ReservationStatus.EXPIRED
+
+    def cancel(self) -> None:  # 예매 취소 상태로 변경, 예매 취소 시간 추가
+        if self.status != ReservationStatus.PENDING:
+            raise ValueError(
+                f"예매 취소 시 상태는 PENDING 상태여야 합니다. [현재 상태 : {self.status}]"
+            )
+
+        self.status = ReservationStatus.CANCELED
+        self.canceled_at = datetime.now(UTC)
