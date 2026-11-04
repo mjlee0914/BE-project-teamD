@@ -50,8 +50,8 @@ class Ticket:
     ticket_code: UUID
     price: int
     performance_title: str
-    performance_starts_at: datetime
-    performance_ends_at: datetime
+    performance_start_at: datetime
+    performance_end_at: datetime
     cancel_deadline_at: datetime
 
     # 기본값이 있는 필드 나중에 정의
@@ -59,6 +59,7 @@ class Ticket:
     status: TicketStatus = TicketStatus.PENDING  # 기본 값 pending
     issued_at: datetime | None = None
     canceled_at: datetime | None = None
+    used_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -66,5 +67,5 @@ class Ticket:
     def __post_init__(self) -> None:
         if self.price <= 0:
             raise TicketError("가격은 0원 보다 커야 합니다")
-        if self.performance_ends_at <= self.performance_starts_at:
+        if self.performance_end_at <= self.performance_start_at:
             raise TicketError("공연 종료 시각은 시작 시각보다 뒤여야 합니다")
