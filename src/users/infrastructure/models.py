@@ -1,5 +1,5 @@
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from sqlalchemy import BigInteger, DateTime, String, Text, func
 from sqlalchemy import Enum as SQLEnum
@@ -11,13 +11,13 @@ from shared.core.models import Base
 
 
 # 회원 권한
-class UserRole(str, Enum):
+class UserRole(StrEnum):
     USER = "USER"    # 일반 회원
     ADMIN = "ADMIN"  # 관리자
 
 
 # 회원 상태 (탈퇴 여부는 WITHDRAWN으로 판단)
-class UserStatus(str, Enum):
+class UserStatus(StrEnum):
     ACTIVE = "ACTIVE"        # 정상
     SUSPENDED = "SUSPENDED"  # 정지
     WITHDRAWN = "WITHDRAWN"  # 탈퇴
