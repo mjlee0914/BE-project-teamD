@@ -43,7 +43,7 @@ class Festival(DateTimeMixin, Base):
         nullable=False,
     )
 
-    canceled_at: Mapped[datetime | None ] = mapped_column(
+    canceled_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )
