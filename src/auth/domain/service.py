@@ -1,24 +1,17 @@
 from abc import ABC, abstractmethod
-from typing import Literal
 
 from auth.domain.entities import TokenPayload
 
 
 class TokenProvider(ABC):
-    """액세스·리프레시 토큰의 발급 및 검증 계약."""
+    """액세스 토큰의 발급 및 검증 계약."""
 
     @abstractmethod
     def create_access_token(self, user_id: int) -> str:
         pass
 
     @abstractmethod
-    def create_refresh_token(self, user_id: int) -> str:
-        pass
-
-    @abstractmethod
-    def decode_token(
-        self, token: str, *, expected_type: Literal["access", "refresh"] = "access"
-    ) -> TokenPayload:
+    def decode_token(self, token: str) -> TokenPayload:
         pass
 
 

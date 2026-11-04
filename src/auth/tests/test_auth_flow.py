@@ -58,91 +58,54 @@ class AuthFlowTests(unittest.TestCase):
 
         self.client = TestClient(app, raise_server_exceptions=False)
         self.access = self.tokens.create_access_token(1)
-        self.refresh = self.tokens.create_refresh_token(1)
         self.headers = {"Authorization": f"Bearer {self.access}"}
 
     def tearDown(self) -> None:
         self.client.close()
 
-    def logout(self, refresh_token=None):
-        return self.client.post(
-            "/v1/auth/logout",
-            headers=self.headers,
-            json={"refresh_token": refresh_token or self.refresh},
-        )
+    def logout(self):
+        return self.client.post("/v1/auth/logout", headers=self.headers)
 
-    def test_logout_blocks_access_and_refresh_immediately(self) -> None:
+    def test_logout_blocks_access_immediately(self) -> None:
         self.assertEqual(
             self.client.get("/protected", headers=self.headers).status_code, 200
         )
         self.assertEqual(self.logout().status_code, 200)
-        self.assertEqual(len(self.committed), 2)
+        self.assertEqual(len(self.committed), 1)
         self.db.commit.assert_awaited_once()
         response = self.client.get("/protected", headers=self.headers)
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.headers["WWW-Authenticate"], "Bearer")
-        response = self.client.post(
-            "/v1/auth/refresh", json={"refresh_token": self.refresh}
-        )
-        self.assertEqual(response.status_code, 401)
 
-    def test_repeated_logout_keeps_two_records(self) -> None:
+    def test_repeated_logout_keeps_one_record(self) -> None:
         self.assertEqual(self.logout().status_code, 200)
         self.assertEqual(self.logout().status_code, 200)
-        self.assertEqual(len(self.committed), 2)
+        self.assertEqual(len(self.committed), 1)
 
-    def test_refresh_issues_a_new_access_token(self) -> None:
-        response = self.client.post(
-            "/v1/auth/refresh", json={"refresh_token": self.refresh}
+    def test_refresh_endpoint_is_not_available(self) -> None:
+        response = self.client.post("/v1/auth/refresh")
+        self.assertEqual(response.status_code, 404)
+        self.assertNotIn(
+            "/v1/auth/refresh", self.client.get("/openapi.json").json()["paths"]
         )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["token_type"], "bearer")
-        claims = self.tokens.decode_token(response.json()["access_token"])
-        self.assertEqual(claims.user_id, 1)
-        self.assertNotEqual(claims.jti, self.tokens.decode_token(self.access).jti)
+        self.db.execute.assert_not_awaited()
 
-    def test_different_members_tokens_are_rejected_before_saving(self) -> None:
-        response = self.logout(self.tokens.create_refresh_token(2))
+    def test_invalid_access_is_rejected_before_saving(self) -> None:
+        response = self.client.post(
+            "/v1/auth/logout", headers={"Authorization": "Bearer not-a-token"}
+        )
         self.assertEqual(response.status_code, 401)
         self.db.execute.assert_not_awaited()
         self.db.commit.assert_not_awaited()
 
-    def test_invalid_refresh_is_rejected_before_saving(self) -> None:
-        self.assertEqual(self.logout("not-a-token").status_code, 401)
-        self.db.execute.assert_not_awaited()
-
     def test_missing_bearer_token_is_rejected(self) -> None:
         self.assertEqual(self.client.get("/protected").status_code, 401)
-        response = self.client.post(
-            "/v1/auth/logout", json={"refresh_token": self.refresh}
-        )
+        response = self.client.post("/v1/auth/logout")
         self.assertEqual(response.status_code, 401)
         self.db.execute.assert_not_awaited()
 
-    def test_refresh_cannot_be_used_as_access(self) -> None:
-        response = self.client.get(
-            "/protected", headers={"Authorization": f"Bearer {self.refresh}"}
-        )
-        self.assertEqual(response.status_code, 401)
-
-    def test_access_cannot_be_used_for_refresh(self) -> None:
-        response = self.client.post(
-            "/v1/auth/refresh", json={"refresh_token": self.access}
-        )
-        self.assertEqual(response.status_code, 401)
-
-    def test_second_save_failure_rolls_back_both_records(self) -> None:
-        save = self.db.execute.side_effect
-        calls = 0
-
-        async def fail_second_save(statement):
-            nonlocal calls
-            calls += 1
-            if calls == 2:
-                raise RuntimeError("save failed")
-            await save(statement)
-
-        self.db.execute.side_effect = fail_second_save
+    def test_save_failure_rolls_back(self) -> None:
+        self.db.execute.side_effect = RuntimeError("save failed")
         self.assertEqual(self.logout().status_code, 500)
         self.assertEqual(self.committed, set())
         self.assertEqual(self.pending, set())
@@ -156,12 +119,8 @@ class AuthFlowTests(unittest.TestCase):
         self.assertEqual(self.pending, set())
         self.db.rollback.assert_awaited_once()
 
-    def test_lookup_failure_does_not_allow_access_or_refresh(self) -> None:
+    def test_lookup_failure_does_not_allow_access(self) -> None:
         self.db.scalar.side_effect = RuntimeError("lookup failed")
         self.assertEqual(
             self.client.get("/protected", headers=self.headers).status_code, 500
         )
-        response = self.client.post(
-            "/v1/auth/refresh", json={"refresh_token": self.refresh}
-        )
-        self.assertEqual(response.status_code, 500)

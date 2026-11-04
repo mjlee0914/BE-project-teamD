@@ -134,9 +134,13 @@ class PaymentRouterTests(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
         self.service.pay.assert_not_awaited()
 
-    def test_refresh_token_cannot_access_payment_api(self) -> None:
-        headers = {"Authorization": f"Bearer {self.tokens.create_refresh_token(7)}"}
-        response = self.client.post("/payments", headers=headers, json=self.payload)
+    def test_non_access_token_cannot_access_payment_api(self) -> None:
+        payload = jwt.decode(self.access, self.key, algorithms=["HS256"])
+        payload["token_type"] = "refresh"
+        token = jwt.encode(payload, self.key, algorithm="HS256")
+        response = self.client.post(
+            "/payments", headers={"Authorization": f"Bearer {token}"}, json=self.payload
+        )
         self.assertEqual(response.status_code, 401)
         self.service.pay.assert_not_awaited()
 

@@ -1,5 +1,9 @@
 from dataclasses import dataclass
-from datetime import datetime
+
+
+class UnauthorizedException(Exception):
+    """인증 토큰이 유효하지 않거나 사용이 차단된 경우 발생합니다."""
+
 
 @dataclass(frozen=True)
 class TokenPayload:
@@ -7,8 +11,6 @@ class TokenPayload:
 
     user_id: int
     jti: str
-    # token_type: Literal["access", "refresh"] = "access"
-    """리프레시 토큰은 교안에 없어서 반영하지 않았습니다."""
 
 
 @dataclass

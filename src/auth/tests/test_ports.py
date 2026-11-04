@@ -1,5 +1,4 @@
 import unittest
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock
 
 from auth.application.service import AuthService
@@ -17,32 +16,23 @@ class AuthServicePortTests(unittest.IsolatedAsyncioTestCase):
         self.tokens = Mock(spec=TokenProvider)
         self.transaction = AsyncMock(spec=TransactionManager)
         self.service = AuthService(self.repository, self.tokens, self.transaction)
-        now = datetime(2026, 11, 4, tzinfo=UTC)
-        self.access = TokenPayload(user_id=1, jti="access-jti", exp=now)
-        self.refresh = TokenPayload(
-            user_id=1, jti="refresh-jti", exp=now, token_type="refresh"
-        )
-        self.tokens.decode_token.side_effect = lambda token, **kwargs: (
-            self.refresh if kwargs.get("expected_type") == "refresh" else self.access
-        )
+        self.access = TokenPayload(user_id=1, jti="access-jti")
+        self.tokens.decode_token.return_value = self.access
 
     async def test_logout_uses_injected_repository_and_transaction(self) -> None:
-        await self.service.logout("access", "refresh")
+        await self.service.logout("access")
         self.assertEqual(
             self.repository.add.await_args_list[0].kwargs,
             {"jti": "access-jti", "user_id": 1},
         )
-        self.assertEqual(
-            self.repository.add.await_args_list[1].kwargs,
-            {"jti": "refresh-jti", "user_id": 1},
-        )
+        self.repository.add.assert_awaited_once_with(jti="access-jti", user_id=1)
         self.transaction.commit.assert_awaited_once()
         self.transaction.rollback.assert_not_awaited()
 
     async def test_injected_provider_failure_prevents_storage(self) -> None:
         self.tokens.decode_token.side_effect = UnauthorizedException("expired")
         with self.assertRaises(UnauthorizedException):
-            await self.service.logout("access", "refresh")
+            await self.service.logout("access")
         self.repository.add.assert_not_awaited()
         self.transaction.commit.assert_not_awaited()
 
@@ -52,11 +42,6 @@ class AuthServicePortTests(unittest.IsolatedAsyncioTestCase):
             await self.service.authenticate_token("access")
         self.repository.is_blacklisted.assert_awaited_once_with("access-jti")
 
-    async def test_different_users_are_rejected_without_writes(self) -> None:
-        self.refresh = TokenPayload(
-            user_id=2, jti="other-jti", exp=self.access.exp, token_type="refresh"
-        )
-        with self.assertRaises(UnauthorizedException):
-            await self.service.logout("access", "refresh")
-        self.repository.add.assert_not_awaited()
-        self.transaction.commit.assert_not_awaited()
+    async def test_authenticated_payload_is_returned(self) -> None:
+        self.assertIs(await self.service.authenticate_token("access"), self.access)
+        self.tokens.decode_token.assert_called_once_with("access")

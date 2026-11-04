@@ -21,10 +21,10 @@ auth/
 │  └─ transactions.py      # SqlAlchemyTransactionManager
 ├─ presentation/
 │  ├─ dependencies.py      # provide_auth_service, get_current_token
-│  ├─ schemas.py           # TokenResponse, RefreshTokenRequest, LogoutResponse
+│  ├─ schemas.py           # LogoutResponse
 │  └─ routers/
 │     └─ v1/
-│        └─ router.py      # /v1/auth/logout, /v1/auth/refresh
+│        └─ router.py      # /v1/auth/logout
 ├─ wiring.py              # 실제 구현체 조립·바인딩
 ├─ tests/
 ├─ GLOSSARY.md            # 계층·문법·도구·DB·인증 용어 사전
@@ -37,25 +37,24 @@ auth/
 
 | 이전 | 현재 | 교안과 연결 |
 | --- | --- | --- |
-| TokenClaims | [TokenPayload](domain/entities.py) | 검증된 토큰 정보를 표현. 만료 시각 exp도 전달 |
-| TokenBlacklistEntry | [BlacklistToken](domain/entities.py) | 차단할 토큰의 정보와 검증 |
+| TokenClaims | [TokenPayload](domain/entities.py) | 검증된 회원 ID와 jti를 전달. 만료는 JWT 구현체에서 검증 |
+| TokenBlacklistEntry | [BlacklistToken](domain/entities.py) | 차단할 토큰의 정보 |
 | JWTTokenProvider | [JwtTokenProvider](infrastructure/security.py) | 교안과 같은 클래스 표기 |
-| decode_access_token / decode_refresh_token | TokenProvider.decode_token() | 검증 메서드 이름 통합. expected_type으로 토큰 용도 검사 유지 |
+| decode_access_token / decode_refresh_token | TokenProvider.decode_token() | 액세스 토큰만 검증. expected_type 인자와 리프레시 발급은 제거 |
 | save() | TokenBlacklistRepository.add() | 차단 기록 추가. 현재 ERD에 맞춰 jti·user_id를 받음 |
 | exists_by_jti() | TokenBlacklistRepository.is_blacklisted() | 차단 여부 조회 |
 | authenticate_access_token() | AuthService.authenticate_token() | 보호 API용 인증 처리 |
 | get_auth_service() | [provide_auth_service()](presentation/dependencies.py) | 구체 구현을 모르는 주입 명세 |
-| AccessTokenResponse | [TokenResponse](presentation/schemas.py) | 토큰 응답 스키마 이름 통일 |
 | TokenValidationError | UnauthorizedException | 인증 오류 이름 통일. 공유 예외 파일은 수정 범위 밖이므로 entities.py에 정의 |
 | TokenBlacklistService | [AuthService](application/service.py) 내부로 통합 | 교안처럼 인증·차단 흐름을 응용 서비스 한 곳에서 조율 |
 | presentation/router.py | [presentation/routers/v1/router.py](presentation/routers/v1/router.py) | 교안의 실제 예제 경로에 맞춰 이동 |
-| /auth/logout, /auth/refresh | /v1/auth/logout, /v1/auth/refresh | 버전 접두사 적용. 이전 주소는 별칭으로 제공하지 않음 |
+| /auth/logout, /auth/refresh | /v1/auth/logout | 버전 접두사 적용. 이전 주소는 별칭으로 제공하지 않음 |
 
 과거 이름은 비교표의 이력 설명입니다. 실행 코드는 새 이름을 사용합니다. 구형 import 경로에 대한 호환 래퍼는 두지 않았습니다.
 
 ## 3. 도메인과 인터페이스
 
-[domain/entities.py](domain/entities.py)는 TokenPayload와 BlacklistToken을 함께 정의합니다. TokenPayload는 회원 ID·jti·만료 시각·토큰 종류를 담고, BlacklistToken은 현재 DB에 저장할 jti·회원 ID를 검증합니다. JWT 문자열을 도메인 객체로 변환했다고 해서 임의의 객체가 인증된 것은 아니며, 실제 요청은 JwtTokenProvider의 검증을 거칩니다.
+[domain/entities.py](domain/entities.py)는 TokenPayload와 BlacklistToken을 함께 정의합니다. TokenPayload는 회원 ID·jti를 담고, BlacklistToken은 DB에 저장할 jti·회원 ID를 담습니다. 서명·만료·클레임 검증은 JWT 구현체에서 수행합니다. JWT 문자열을 도메인 객체로 변환했다고 해서 임의의 객체가 인증된 것은 아니며, 실제 요청은 JwtTokenProvider의 검증을 거칩니다.
 
 [domain/repository.py](domain/repository.py)는 add()·is_blacklisted() 계약을 정의합니다. 기존 상세 조회 기능은 find_by_jti()로 유지했습니다. 구체 구현은 ORM 객체를 상위로 노출하지 않고 BlacklistToken 또는 bool을 반환합니다.
 
@@ -64,20 +63,16 @@ auth/
 ## 4. AuthService로 통합한 흐름
 
 ```text
-AuthService.logout(token, refresh_token)
+AuthService.logout(token)
   → decode_token(token)
-  → decode_token(refresh_token, expected_type="refresh")
-  → 두 회원 ID가 같은지 검사
-  → BlacklistToken 생성·검증
   → _blacklist_repo.add(access의 jti, user_id)
-  → _blacklist_repo.add(refresh의 jti, user_id)
   → _transaction.commit()
   → 성공 반환
 ```
 
 저장·커밋 오류는 rollback 후 다시 전달합니다. SQLAlchemy 구현체는 같은 AsyncSession을 공유합니다. 중복 jti는 ON CONFLICT DO NOTHING으로 기존 기록을 유지합니다. 차단 등록을 백그라운드로 미루지 않습니다.
 
-authenticate_token()은 액세스 토큰을 검증하고 is_blacklisted()를 조회합니다. refresh_access_token()은 리프레시 토큰 용도를 명시적으로 검사하고 차단되지 않은 경우 새 액세스 토큰을 발급합니다.
+authenticate_token()은 액세스 토큰을 검증하고 is_blacklisted()를 조회합니다. 리프레시 토큰 발급과 재발급 API는 제공하지 않습니다. 토큰이 만료되면 다시 로그인해야 합니다. 로그인 연동은 별도 작업입니다.
 
 ## 5. 교안과 동일하게 맞춘 부분 / 유지한 차이
 
@@ -88,13 +83,12 @@ authenticate_token()은 액세스 토큰을 검증하고 is_blacklisted()를 조
 | 객체 조립 | provide_auth_service 주입 명세를 wiring.py의 create_auth_service에 바인딩 |
 | wiring 위치 | 교안의 src/wiring/auth.py 대신 auth/wiring.py. 현재 수정 허용 범위에 맞춘 배치 |
 | 회원 ID | 교안 UUID 대신 팀 ERD의 BIGINT/int 유지 |
-| JWT | 기존 HS256, 액세스 30분·리프레시 7일 유지. create_access_token()은 기존처럼 문자열 반환이며 교안의 메타데이터 포함 튜플 반환과 다름 |
-| decode_token() | 교안 이름으로 통일하되 expected_type 인자를 추가해 두 종류 구분 |
+| JWT | HS256, 액세스 토큰 30분만 사용. create_access_token()은 기존처럼 문자열 반환이며 교안의 메타데이터 포함 튜플 반환과 다름 |
+| decode_token() | 액세스 토큰만 검증하며 TokenPayload에는 회원 ID와 jti만 반환 |
 | 차단 테이블 | token_blacklist 이름과 jti·user_id 유지. expired_at 컬럼 추가 안 함 |
 | 트랜잭션 | 공통 get_db가 자동 커밋하지 않으므로 TransactionManager를 유지 |
 | 예외 위치 | 공유 파일 수정 없이 auth/domain/entities.py의 UnauthorizedException 사용 |
-| 로그아웃 API | 교안의 204·액세스 토큰 한 개 대신 기존 200·두 토큰 차단 유지 |
-| TokenResponse | 이름은 교안과 동일. 기존 access_token·token_type 응답 유지, expires_in 필드는 아직 없음 |
+| 로그아웃 API | POST /v1/auth/logout은 본문 없이 Bearer 액세스 토큰 한 개를 차단하고 200 응답 |
 | 로그인·해싱 | 아직 미구현. 회원 저장소·비밀번호 검증 연동은 별도 단계 |
 | cleanup_expired() | DB 만료 컬럼을 유지하지 않기로 한 현재 정책에서는 미구현 |
 
@@ -124,7 +118,7 @@ app.include_router(payment_router)
 
 ## 7. 검증·남은 작업
 
-인증 37개·결제 62개, 총 99개 테스트가 있습니다. 이름·경로 변경에 맞춰 테스트를 갱신했습니다. JWT 만료·종류·서명 검증, 두 토큰 차단·커밋·롤백, 객체 조립, 결제 인증을 확인합니다. 실제 JWT와 테스트 앱을 사용하지만 DB는 모의 세션입니다.
+인증 34개·결제 62개, 총 96개 테스트가 있습니다. 이름·경로 변경에 맞춰 테스트를 갱신했습니다. JWT 만료·종류·서명 검증, 액세스 토큰 차단·커밋·롤백 및 재발급 API 부재, 객체 조립, 결제 인증을 확인합니다. 실제 JWT와 테스트 앱을 사용하지만 DB는 모의 세션입니다.
 
 [결제 README의 테스트 명령](../payments/README.md#8-테스트와-재현-방법)은 그대로 사용할 수 있습니다. 인증만 검사하려면 roots를 `['src/auth/tests']`로 지정하세요.
 

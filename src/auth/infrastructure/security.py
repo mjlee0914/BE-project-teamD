@@ -1,5 +1,4 @@
 from datetime import UTC, datetime, timedelta
-from typing import Literal
 from uuid import uuid4
 
 import jwt
@@ -17,17 +16,9 @@ class JwtTokenProvider(TokenProvider):
         self._secret_key = secret_key
 
     def create_access_token(self, user_id: int) -> str:
-        return self._create_token(user_id, "access", timedelta(minutes=30))
+        return self._create_token(user_id)
 
-    def create_refresh_token(self, user_id: int) -> str:
-        return self._create_token(user_id, "refresh", timedelta(days=7))
-
-    def _create_token(
-        self,
-        user_id: int,
-        token_type: Literal["access", "refresh"],
-        lifetime: timedelta,
-    ) -> str:
+    def _create_token(self, user_id: int) -> str:
         if type(user_id) is not int or user_id <= 0:
             raise ValueError("회원 ID는 양의 정수여야 합니다.")
         now = datetime.now(UTC)
@@ -35,14 +26,12 @@ class JwtTokenProvider(TokenProvider):
             "sub": str(user_id),
             "jti": str(uuid4()),
             "iat": now,
-            "exp": now + lifetime,
-            "token_type": token_type,
+            "exp": now + timedelta(minutes=30),
+            "token_type": "access",
         }
         return jwt.encode(payload, self._secret_key, algorithm="HS256")
 
-    def decode_token(
-        self, token: str, *, expected_type: Literal["access", "refresh"] = "access"
-    ) -> TokenPayload:
+    def decode_token(self, token: str) -> TokenPayload:
         try:
             payload = jwt.decode(
                 token,
@@ -53,7 +42,7 @@ class JwtTokenProvider(TokenProvider):
         except jwt.InvalidTokenError as exc:
             raise UnauthorizedException("유효하지 않거나 만료된 토큰입니다.") from exc
 
-        if payload["token_type"] != expected_type:
+        if payload["token_type"] != "access":
             raise UnauthorizedException("요청에 사용할 수 없는 종류의 토큰입니다.")
         if not isinstance(payload["jti"], str) or not payload["jti"].strip():
             raise UnauthorizedException("토큰 식별자(jti)가 올바르지 않습니다.")
@@ -69,15 +58,10 @@ class JwtTokenProvider(TokenProvider):
             raise UnauthorizedException("토큰의 회원 ID가 올바르지 않습니다.")
 
         try:
-            expired_at = datetime.fromtimestamp(payload["exp"], tz=UTC)
+            datetime.fromtimestamp(payload["exp"], tz=UTC)
         except (OverflowError, OSError, ValueError) as exc:
             raise UnauthorizedException(
                 "토큰의 만료 시각이 올바르지 않습니다."
             ) from exc
 
-        return TokenPayload(
-            user_id=user_id,
-            jti=payload["jti"],
-            exp=expired_at,
-            token_type=expected_type,
-        )
+        return TokenPayload(user_id=user_id, jti=payload["jti"])

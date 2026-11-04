@@ -49,10 +49,9 @@ class AuthWiringTests(unittest.TestCase):
         response = self.client.post(
             "/v1/auth/logout",
             headers={"Authorization": f"Bearer {self.tokens.create_access_token(1)}"},
-            json={"refresh_token": self.tokens.create_refresh_token(1)},
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.db.execute.await_count, 2)
+        self.assertEqual(self.db.execute.await_count, 1)
         self.db.commit.assert_awaited_once()
 
     def test_payments_share_auth_wiring_and_blocklist_guard(self) -> None:
@@ -85,7 +84,9 @@ class AuthWiringTests(unittest.TestCase):
         app = FastAPI()
         app.include_router(router)
         with TestClient(app, raise_server_exceptions=False) as client:
-            response = client.post("/v1/auth/refresh", json={"refresh_token": "token"})
+            response = client.post(
+                "/v1/auth/logout", headers={"Authorization": "Bearer token"}
+            )
         self.assertEqual(response.status_code, 500)
         self.db.commit.assert_not_awaited()
 
@@ -100,7 +101,7 @@ class AuthWiringTests(unittest.TestCase):
         wire_auth_dependencies(self.app)
         self.assertIn(provide_auth_service, self.app.dependency_overrides)
         response = self.client.post(
-            "/v1/auth/refresh",
-            json={"refresh_token": self.tokens.create_refresh_token(1)},
+            "/v1/auth/logout",
+            headers={"Authorization": f"Bearer {self.tokens.create_access_token(1)}"},
         )
         self.assertEqual(response.status_code, 200)

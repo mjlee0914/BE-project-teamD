@@ -22,33 +22,28 @@ class JwtTokenProviderTests(unittest.TestCase):
             "token_type": "access",
         }
 
-    def test_round_trip_and_lifetimes(self) -> None:
-        for kind, lifetime in [("access", 1800), ("refresh", 604800)]:
-            with self.subTest(kind=kind):
-                token = getattr(self.provider, f"create_{kind}_token")(1)
-                claims = self.provider.decode_token(token, expected_type=kind)
-                self.assertEqual(claims.user_id, 1)
-                self.assertEqual(claims.token_type, kind)
-                payload = jwt.decode(token, self.key, algorithms=["HS256"])
-                self.assertEqual(payload["exp"] - payload["iat"], lifetime)
-                self.assertEqual(int(claims.exp.timestamp()), payload["exp"])
-                self.assertIsNotNone(claims.exp.utcoffset())
+    def test_access_token_round_trip_and_lifetime(self) -> None:
+        token = self.provider.create_access_token(1)
+        claims = self.provider.decode_token(token)
+        self.assertEqual(claims.user_id, 1)
+        payload = jwt.decode(token, self.key, algorithms=["HS256"])
+        self.assertEqual(payload["exp"] - payload["iat"], 1800)
+        self.assertEqual(payload["token_type"], "access")
+        self.assertEqual(claims.jti, payload["jti"])
 
     def test_every_issued_token_has_a_distinct_jti(self) -> None:
         tokens = [self.provider.create_access_token(1) for _ in range(3)]
-        tokens.append(self.provider.create_refresh_token(1))
         jtis = {
             jwt.decode(token, self.key, algorithms=["HS256"])["jti"] for token in tokens
         }
-        self.assertEqual(len(jtis), 4)
+        self.assertEqual(len(jtis), 3)
 
-    def test_access_and_refresh_are_not_interchangeable(self) -> None:
+    def test_non_access_token_is_rejected(self) -> None:
+        payload = self.payload()
+        payload["token_type"] = "refresh"
+        token = jwt.encode(payload, self.key, algorithm="HS256")
         with self.assertRaises(UnauthorizedException):
-            self.provider.decode_token(self.provider.create_refresh_token(1))
-        with self.assertRaises(UnauthorizedException):
-            self.provider.decode_token(
-                self.provider.create_access_token(1), expected_type="refresh"
-            )
+            self.provider.decode_token(token)
 
     def test_wrong_signature_is_rejected(self) -> None:
         token = JwtTokenProvider(
