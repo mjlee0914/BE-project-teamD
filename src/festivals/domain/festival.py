@@ -29,17 +29,19 @@ from festivals.domain.enums import FestivalStatus
 
 @dataclass
 class Festival:
+    # 생성할 때 직접 넣어야 하는 필수값
     name: str
     venue: str
     starts_on: date
     ends_on: date
 
     # 기본값이 있는 필드가 아래쪽 위치
-    # db가 채우는 값
+    # DB 저장 전에는 없고, 저장 후 DB가 채워주는 값
     id: int | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
+    # 실제로 값이 없어도 되는 선택값
     description: str | None = None
     canceled_at: datetime | None = None
 
