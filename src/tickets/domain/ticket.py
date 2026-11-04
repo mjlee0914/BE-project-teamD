@@ -21,9 +21,10 @@
 11. CANCELED, USED, EXPIRED는 끝난 상태라 다른 상태로 바꿀 수 없다.
 """
 
-from dataclasses import dataclass  # 엔티티 반복 코드 줄여주는 도구
+from dataclasses import dataclass, field  # 엔티티 반복 코드 줄여주는 도구
 from datetime import datetime
-from uuid import UUID
+from uuid import UUID, uuid4
+
 
 from tickets.domain.enums import TicketStatus
 
@@ -47,7 +48,6 @@ class Ticket:
     # 기본값이 없는 필드 반드시 먼저 정의
     reservation_id: int
     performance_id: int
-    ticket_code: UUID
     price: int
     performance_title: str
     performance_start_at: datetime
@@ -62,10 +62,11 @@ class Ticket:
     used_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    ticket_code: UUID = field(default_factory=uuid4)
 
     # 잘못된 티켓이 발행되지 않게 검증
     def __post_init__(self) -> None:
         if self.price <= 0:
-            raise TicketError("가격은 0원 보다 커야 합니다")
+            raise TicketError("가격은 0원보다 커야 합니다")
         if self.performance_end_at <= self.performance_start_at:
             raise TicketError("공연 종료 시각은 시작 시각보다 뒤여야 합니다")

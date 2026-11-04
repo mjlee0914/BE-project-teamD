@@ -18,13 +18,7 @@ from shared.core.models import Base
 
 
 #티켓 상태 상수
-
-class TicketStatus(str, enum.Enum):
-    PENDING = "PENDING"
-    ISSUED = "ISSUED"
-    CANCELED = "CANCELED"
-    USED = "USED"
-    EXPIRED ="EXPIRED"
+from tickets.domain.enums import TicketStatus
 
 
 #티켓 DB컬럼
@@ -44,12 +38,14 @@ class Ticket(Base):
     #테이블 컬럼
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     reservation_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("reservations.id"), index=True)
-    performance_id: Mapped[int]=mapped_column(BigInteger, ForeignKey("performances.id"), index=True)
+    performance_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("performances.id"), index=True)
 
     #enum에 적어둔 PENDING값 꺼내옴.PENDING의 (.value)값! 
     status: Mapped[str] = mapped_column(Text, default= TicketStatus.PENDING.value, index=True)
+    
     #uuid1부터 uuid4가지 있는데 uuid4가 완전 무작위
     ticket_code: Mapped[uuid.UUID] = mapped_column(Uuid, unique = True, index=True, default=uuid.uuid4)
+    cancel_deadline_at : Mapped[DateTime] = mapped_column(DateTime(timezone=True))
 
     #공연정보 스냅샷
     performance_start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
