@@ -1,5 +1,5 @@
 from datetime import datetime
-from enum import StrEnum
+from enum import StrEnum  # StrEnum : 출력 시 값 그대로 나와서 안전
 
 from sqlalchemy import BigInteger, DateTime, String, Text, func
 from sqlalchemy import Enum as SQLEnum
