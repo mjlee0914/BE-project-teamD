@@ -45,7 +45,7 @@ class Ticket(Base):
     
     #uuid1부터 uuid4가지 있는데 uuid4가 완전 무작위
     ticket_code: Mapped[uuid.UUID] = mapped_column(Uuid, unique = True, index=True, default=uuid.uuid4)
-    cancel_deadline_at : Mapped[DateTime] = mapped_column(DateTime(timezone=True))
+    cancel_deadline_at : Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     #공연정보 스냅샷
     performance_start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
