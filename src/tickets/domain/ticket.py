@@ -31,19 +31,7 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from tickets.domain.enums import TicketStatus
-
-
-# 에러 클래스
-class TicketError(ValueError):
-    """티켓 규칙을 어겼을 때의 공통 예외"""
-
-
-class NotCancelable(TicketError):
-    """취소할 수 없는 티켓"""
-
-
-class NotEnterable(TicketError):
-    """입장할 수 없는 티켓"""
+from tickets.domain.exceptions import InvalidTicketPerformanceTime, InvalidTicketPrice
 
 
 # 티켓양식
@@ -76,6 +64,8 @@ class Ticket:
     # self의 price, 공연 시각을 읽어야 해서 staticmethod가 아닌 인스턴스 메서드로 작성
     def __post_init__(self) -> None:
         if self.price <= 0:
-            raise TicketError("가격은 0원보다 커야 합니다")
+            raise InvalidTicketPrice("가격은 0원보다 커야 합니다")
         if self.performance_end_at <= self.performance_start_at:
-            raise TicketError("공연 종료 시각은 시작 시각보다 뒤여야 합니다")
+            raise InvalidTicketPerformanceTime(
+                "공연 종료 시각은 시작 시각보다 뒤여야 합니다"
+            )
