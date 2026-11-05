@@ -8,10 +8,11 @@ router/service/domain에서 raise NotFoundException("3번 예매가 없습니다
 → FastAPI가 예외 종류에 맞는 핸들러를 찾아 실행
 → 핸들러가 로그를 남기고 APIResponse.fail(...) 형식의 JSON으로 응답
 
-# 핸들러 3종
+# 핸들러 4종
 1. SharedException (+ 하위 예외)  → 예외에 지정된 상태 코드 (401, 403, 404, 409, 422)
 2. RequestValidationError        → 422 (Pydantic 스키마 검증 실패, FastAPI가 자동으로 발생시킴)
-3. Exception (그 외 모든 예외)     → 500 (예상하지 못한 서버 오류)
+3. HTTPException (Starlette)    → 404, 405, 401 등 (없는 URL, 허용 안 된 메서드, 토큰 누락)
+4. Exception (그 외 모든 예외)     → 500 (예상하지 못한 서버 오류)
 
 # 응답 예시
 {"success": false, "code": "NOT_FOUND", "message": "3번 예매가 없습니다.", "errors": null, "data": null, "responded_at": "..."}
@@ -19,6 +20,7 @@ router/service/domain에서 raise NotFoundException("3번 예매가 없습니다
 
 # 외부 라이브러리
 from fastapi import FastAPI, Request, status
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -93,12 +95,37 @@ def register_exception_handlers(app: FastAPI) -> None:
             content=response_dto.model_dump(mode="json"),
         )
 
-    # 3. 처리되지 않은 시스템 내부 오류 (500)
-    # 위 두 핸들러에 걸리지 않은 모든 예외 (DB 연결 실패, 코드 버그 등)
+    # 3. 프레임워크가 직접 발생시키는 HTTP 예외 (404, 405, 401 등)
+    # 없는 URL(404), 허용하지 않는 메서드(405), 토큰 누락(HTTPBearer) 등 우리 코드를 거치지 않고 Starlette/FastAPI가 발생시킴
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+        logger.warning(
+            "HTTP 예외 [%s] %s (path: %s, method: %s)",
+            exc.status_code,
+            exc.detail,
+            request.url.path,
+            request.method,
+        )
+
+        response_dto = APIResponse.fail(
+            code="HTTP_ERROR",
+            message=str(exc.detail),
+            errors=None,
+        )
+
+        # headers: 401 응답의 WWW-Authenticate 같은 헤더를 그대로 유지하기 위해 넘김
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=response_dto.model_dump(mode="json"),
+            headers=exc.headers,
+        )
+
+    # 4. 처리되지 않은 시스템 내부 오류 (500)
+    # 위 핸들러들에 걸리지 않은 모든 예외 (DB 연결 실패, 코드 버그 등)
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception):
         # logger.exception: 에러 내용과 함께 어디서 났는지(traceback)까지 로그로 남김
-        logger.exception(
+        logger.warning(
             "처리되지 않은 치명적 시스템 오류 발생 (path: %s, method: %s): %s",
             request.url.path,
             request.method,
