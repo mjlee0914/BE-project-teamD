@@ -102,6 +102,6 @@ class Reservation(Base):
         BigInteger, ForeignKey("users.id"), nullable=False, index=True
     )
 
-    performance_id: Mapped[int] = mapped_column(  # 예매한 공연
-        BigInteger, ForeignKey("performances.id"), nullable=False, index=True
+    festival_id: Mapped[int] = mapped_column(  # 예매한 축제
+        BigInteger, ForeignKey("festivals.id"), nullable=False, index=True
     )
