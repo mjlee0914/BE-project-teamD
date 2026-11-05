@@ -1,4 +1,3 @@
 {
-  "specstory.cloudSync.enabled": "never",
-  "editor.fontSize": 20
+  "specstory.cloudSync.enabled": "never"
 }

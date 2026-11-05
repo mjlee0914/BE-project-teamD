@@ -74,7 +74,7 @@ class Reservation:
         # 티켓 수량은 1장 이상이어야 한다.
         if not 1 <= self.quantity:
             raise InvalidReservationQuantity(
-                f"티켓 수량은 1장 이상이여야 합니다. [입력 : {self.quantity}]"
+                f"티켓 수량은 1장 이상이어야 합니다. [입력 : {self.quantity}]"
             )
         # 티켓 수량은 MAX_QUANTITY_PER_RESERVATION 이하여야 한다.
         if not MAX_QUANTITY_PER_RESERVATION >= self.quantity:
@@ -96,7 +96,7 @@ class Reservation:
             raise InvalidReservationPrice(
                 f"할인 금액은 총 금액보다 클 수 없습니다. (총 금액 : {self.total_price}, 할인 금액 : {self.discount_amount})"
             )
-        # 최종 결제 금액은 총 금액 - 할인 금액 이여야 한다.
+        # 최종 결제 금액은 총 금액 - 할인 금액 이어야 한다.
         if self.final_price != (self.total_price - self.discount_amount):
             raise InvalidReservationPrice(
                 f"최종 결제 금액은 총 금액 - 할인 금액과 같아야 합니다. (최종 결제 금액 : {self.final_price}, 총 금액 - 할인 금액 : {self.total_price - self.discount_amount})"
