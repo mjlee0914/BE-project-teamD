@@ -21,12 +21,12 @@ class TicketRepository(ABC):
 
     # 입장처리
     @abstractmethod
-    async def get_by_code(self, ticket_code: UUID) -> Ticket | None:
+    async def find_by_code(self, ticket_code: UUID) -> Ticket | None:
         """ticket_code로 조회한다."""
 
     # 티켓 조회
     @abstractmethod
-    async def get_by_id_for_user(self, ticket_id: int, user_id: int) -> Ticket | None:
+    async def find_by_id_for_user(self, ticket_id: int, user_id: int) -> Ticket | None:
         """본인 티켓만 조회한다. 없거나 남의 티켓이면 None."""
 
     # 중복발급 검사
