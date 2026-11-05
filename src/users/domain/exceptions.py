@@ -28,7 +28,7 @@ class DuplicateEmail(ConflictException):
         super().__init__(message=message, error_code="EMAIL_ALREADY_EXISTS")
 
 
-# 이미 가입된 전화번호 (규칙 8, service에서 대응)
+# 이미 가입된 전화번호 (규칙 9, service에서 대응)
 class DuplicatePhone(ConflictException):
     def __init__(self, message: str = "이미 사용 중인 전화번호입니다."):
         super().__init__(message=message, error_code="PHONE_ALREADY_EXISTS")
@@ -46,25 +46,25 @@ class InvalidName(UnprocessableException):
         super().__init__(message=message, error_code="INVALID_NAME")
 
 
-# 비밀번호 규칙 위반, 기존 비밀번호 불일치, 같은 비밀번호로 변경 (규칙 5, 12, 13)
+# 비밀번호 규칙 위반, 기존 비밀번호 불일치, 같은 비밀번호로 변경 (규칙 6, 13, 14)
 class InvalidPassword(UnprocessableException):
     def __init__(self, message: str = "비밀번호 규칙을 만족하지 않습니다."):
         super().__init__(message=message, error_code="INVALID_PASSWORD")
 
 
-# 전화번호 형식 위반 (규칙 7)
+# 전화번호 형식 위반 (규칙 8)
 class InvalidPhone(UnprocessableException):
     def __init__(self, message: str = "올바른 전화번호 형식이 아닙니다."):
         super().__init__(message=message, error_code="INVALID_PHONE")
 
 
-# 현재 상태에서 처리 불가 : 탈퇴 회원 -> 탈퇴 회원의 비밀번호 변경 (규칙 11, 15)
+# 현재 상태에서 처리 불가 : 탈퇴 회원 -> 탈퇴 회원의 비밀번호 변경 (규칙 12, 16)
 class InvalidUserStatus(ConflictException):
     def __init__(self, message: str = "현재 회원 상태에서 처리할 수 없는 요청입니다."):
         super().__init__(message=message, error_code="INVALID_USER_STATUS")
 
 
-# 본인 또는 관리자가 아닌 사용자의 탈퇴 요청 (규칙 14)
+# 본인 또는 관리자가 아닌 사용자의 탈퇴 요청 (규칙 15)
 class WithdrawPermissionDenied(ForbiddenException):
     def __init__(self, message: str = "탈퇴는 본인 또는 관리자만 가능합니다."):
         super().__init__(message=message, error_code="WITHDRAW_PERMISSION_DENIED")

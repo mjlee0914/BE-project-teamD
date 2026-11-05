@@ -8,26 +8,27 @@
 
 [이름·비밀번호]
 4. 이름은 2자 이상 20자 이하여야 한다.
-5. 비밀번호는 8자 이상이며 영문·숫자·특수문자(@$!%*#?&)를 각각 1개 이상 포함하고, 이 문자들로만 구성한다.
-6. 비밀번호 원문은 저장하지 않고 bcrypt 해시만 저장한다. (해싱은 PasswordHasher에 맡긴다)
+5. 이름은 앞뒤 공백을 제거하고 공백 기입이 불가능하다.
+6. 비밀번호는 8자 이상이며 영문·숫자·특수문자(@$!%*#?&)를 각각 1개 이상 포함하고, 이 문자들로만 구성한다.
+7. 비밀번호 원문은 저장하지 않고 bcrypt 해시만 저장한다. (해싱은 PasswordHasher에 맡긴다)
 
 [전화번호]
-7. 전화번호는 선택 입력이며, 하이픈·공백을 제거해 숫자만 저장한다. (예: 010-1234-5678 → 01012345678)
-8. 전화번호는 중복될 수 없다. (중복 확인은 application(service)에서 한다)
+8. 전화번호는 선택 입력이며, 하이픈·공백을 제거해 숫자만 저장한다. (예: 010-1234-5678 → 01012345678)
+9. 전화번호는 중복될 수 없다. (중복 확인은 application(service)에서 한다)
 
 [상태·역할]
-9. 상태는 ACTIVE / SUSPENDED / WITHDRAWN 이며, 새 회원은 항상 ACTIVE다.
-10. 역할은 USER / ADMIN 이며, 새 회원은 항상 USER다. email·role은 회원 정보 수정으로 바꿀 수 없다.
-11. 탈퇴한(WITHDRAWN) 회원은 비밀번호를 변경할 수 없다.
+10. 상태는 ACTIVE / SUSPENDED / WITHDRAWN 이며, 새 회원은 항상 ACTIVE다.
+11. 역할은 USER / ADMIN 이며, 새 회원은 항상 USER다. email·role은 회원 정보 수정으로 바꿀 수 없다.
+12. 탈퇴한(WITHDRAWN) 회원은 비밀번호를 변경할 수 없다.
 
 [비밀번호 변경]
-12. 기존 비밀번호가 일치해야 변경할 수 있다.
-13. 새 비밀번호는 기존 비밀번호와 같을 수 없고, 5번 규칙을 만족해야 한다.
+13. 기존 비밀번호가 일치해야 변경할 수 있다.
+14. 새 비밀번호는 기존 비밀번호와 같을 수 없고, 6번 규칙을 만족해야 한다.
 
 [탈퇴]
-14. 탈퇴는 본인 또는 ADMIN만 할 수 있다.
-15. 이미 탈퇴한 회원은 다시 탈퇴할 수 없다.
-16. 탈퇴는 행을 지우지 않고 status=WITHDRAWN + deleted_at을 기록한다. (논리 삭제)
+15. 탈퇴는 본인 또는 ADMIN만 할 수 있다.
+16. 이미 탈퇴한 회원은 다시 탈퇴할 수 없다.
+17. 탈퇴는 행을 지우지 않고 status=WITHDRAWN + deleted_at을 기록한다. (논리 삭제)
 
 [보류]
 - SUSPENDED 회원의 이용 범위, 진행 중인 예매가 있을 때 탈퇴 제한, 탈퇴 후 재가입
@@ -92,6 +93,14 @@ def normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
+"""이름 공백 정규화"""
+
+
+# 이름 공백 제거 및 기입 불가
+def normalize_name(name: str) -> str:
+    return name.strip()
+
+
 """전화번호 정규화"""
 
 
@@ -129,6 +138,8 @@ class User:
         self.email = normalize_email(self.email)
         # 이메일 형식 검증(실패 시 422)
         self._validate_email(self.email)
+        # 이름 정규화(앞뒤 공백 제거) → 공백만 입력하면 빈 문자열이 되어 길이 검증에서 거부
+        self.name = normalize_name(self.name)
         # 이름 길이 (2~20자) 검증
         self._validate_name(self.name)
         # 전화번호 선택값 -> 있을 때만 정규화 후 검증
@@ -163,23 +174,23 @@ class User:
     def change_password(
         self, old_password: str, new_password: str, hasher: PasswordHasher
     ) -> None:
-        # [1] 상태 검사: 탈퇴 회원은 계정 조작 불가 → 409 (규칙 11)
+        # [1] 상태 검사: 탈퇴 회원은 계정 조작 불가 → 409 (규칙 12)
         if self.status == UserStatus.WITHDRAWN:
             raise InvalidUserStatus(
                 f"이미 탈퇴한 회원입니다. [현재 상태 : {self.status}]"
             )
-        # [2] 본인 확인: 입력한 기존 비밀번호를 저장된 해시와 비교 (규칙 12)
+        # [2] 본인 확인: 입력한 기존 비밀번호를 저장된 해시와 비교 (규칙 13)
         if not hasher.verify(old_password, self.password_hash):
             raise InvalidPassword(
                 "기존 비밀번호가 일치하지 않습니다.",
             )
 
-        # [3] 재사용 방지: 평문끼리 비교 (같은 값이면 422) (규칙 13)
+        # [3] 재사용 방지: 평문끼리 비교 (같은 값이면 422) (규칙 14)
         if old_password == new_password:
             raise InvalidPassword(
                 message="새 비밀번호는 이전 비밀번호와 동일할 수 없습니다."
             )
-        # 새 비밀번호 형식(8자 이상, 영문+숫자+특수문자) 검증 (규칙 5)
+        # 새 비밀번호 형식(8자 이상, 영문+숫자+특수문자) 검증 (규칙 6)
         self._validate_password(new_password)
         # 검증 통과 시 새 비밀번호를 해시해서 저장
         # 객체 상태만 바뀜, DB 반영은 Repository/Service가 담당
@@ -190,12 +201,12 @@ class User:
     # requester: 탈퇴를 '요청한 사람' (self = 탈퇴 '대상')
     # 소프트 삭제 : 실제 DELETE 대신 상태값만 바꿈 → 예매 내역 등 연관 데이터 보존
     def withdraw(self, requester: "User") -> None:
-        # [1] 중복 탈퇴 방지 → 409 (규칙 15)
+        # [1] 중복 탈퇴 방지 → 409 (규칙 16)
         if self.status == UserStatus.WITHDRAWN:
             raise InvalidUserStatus(
                 f"이미 탈퇴 처리된 회원입니다. [현재 상태 : {self.status}]"
             )
-        # [2] 본인 여부: 대상이 DB에 저장된 회원(id 존재)이면서 요청자 id와 같을 때 (규칙 14)
+        # [2] 본인 여부: 대상이 DB에 저장된 회원(id 존재)이면서 요청자 id와 같을 때 (규칙 15)
         is_owner = self.id is not None and self.id == requester.id
         # [3] 관리자 여부: 관리자는 다른 회원도 탈퇴 처리 가능
         is_admin = requester.role == UserRole.ADMIN
@@ -203,7 +214,7 @@ class User:
         if not (is_owner or is_admin):
             raise WithdrawPermissionDenied()
         # [5] 상태 전환: 이후 로그인·예매·비밀번호 변경이 차단되는 기준값
-        # 행을 지우지 않고 상태, 시간만 기록 (규칙 16)
+        # 행을 지우지 않고 상태, 시간만 기록 (규칙 17)
         self.status = UserStatus.WITHDRAWN
         # [6] 탈퇴 시각 기록: 서버 지역과 무관하게 UTC로 통일
         self.deleted_at = datetime.now(UTC)
