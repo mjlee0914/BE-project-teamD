@@ -32,6 +32,6 @@ class InvalidReservationStatus(ConflictException):
 
 
 # 입금 기한 위반: 기한이 지나 승인 불가, 기한 전이라 만료 불가 (규칙 13, 14)
-class DepositDeadlineError(ConflictException):
+class DepositDeadlineViolation(ConflictException):
     def __init__(self, message: str = "입금 기한 조건을 만족하지 않습니다."):
         super().__init__(message=message, error_code="DEPOSIT_DEADLINE_VIOLATION")

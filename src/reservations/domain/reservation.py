@@ -39,7 +39,7 @@ from datetime import UTC, datetime, timedelta
 # 프로젝트 코드
 from reservations.domain.enums import ReservationStatus, TicketType
 from reservations.domain.exceptions import (
-    DepositDeadlineError,
+    DepositDeadlineViolation,
     InvalidReservationPrice,
     InvalidReservationQuantity,
     InvalidReservationStatus,
@@ -143,7 +143,7 @@ class Reservation:
         now = datetime.now(UTC)
         # 입금 기한이 지난 예매는 승인할 수 없다.
         if self.expires_at is not None and now > self.expires_at:
-            raise DepositDeadlineError(
+            raise DepositDeadlineViolation(
                 f"입금 기한이 지나 예매를 승인할 수 없습니다. [입금 기한 : {self.expires_at}]"
             )
 
@@ -157,7 +157,7 @@ class Reservation:
             )
         # 입금 기한이 지나지 않은 예매는 만료할 수 없다.
         if self.expires_at is not None and datetime.now(UTC) <= self.expires_at:
-            raise DepositDeadlineError(
+            raise DepositDeadlineViolation(
                 f"입금 기한이 지나지 않아 예매를 만료할 수 없습니다. [입금 기한 : {self.expires_at}]"
             )
 
