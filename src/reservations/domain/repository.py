@@ -23,7 +23,6 @@ class ReservationRepository(ABC):
     async def find_by_id(self, reservation_id: int) -> Reservation | None:
         """예매 ID기준 단건 조회"""
 
-
     @abstractmethod
     async def save(self, reservation: Reservation) -> Reservation:
         """예매 저장"""
@@ -33,4 +32,3 @@ class ReservationRepository(ABC):
         self, user_id: int
     ) -> list[Reservation]:  # 사용자 한 명은 여러 개의 예매를 가질 수 있음
         """로그인한 사용자의 모든 예매 조회"""
-
