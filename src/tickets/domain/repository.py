@@ -40,7 +40,7 @@ class TicketRepository(ABC):
 
     # 내 티켓 목록/ 전체 개수 반환
     @abstractmethod
-    async def list_by_user(
+    async def get_all_by_user(
         self,
         user_id: int,
         status: TicketStatus | None,
