@@ -11,13 +11,9 @@ from tickets.domain.ticket import Ticket
 class TicketRepository(ABC):
     # 저장
     @abstractmethod
-    async def add(self, ticket: Ticket) -> Ticket:
-        """새 티켓 저장. DB가 채운 id등이 반영된 티켓을 반환한다"""
-
-    # 상태수정
-    @abstractmethod
     async def save(self, ticket: Ticket) -> Ticket:
-        """티켓의 바뀐 상태값을 저장한다"""
+        """티켓을 저장한다. id가 None이면 새로 만들고, 있으면 기존 티켓을 갱신한다.
+        DB가 채운 id, created_at 등이 반영된 티켓을 반환한다."""
 
     # 입장처리
     @abstractmethod
