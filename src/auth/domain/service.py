@@ -1,0 +1,1 @@
+from shared.core.exceptions import UnauthorizedException
