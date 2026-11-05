@@ -30,11 +30,10 @@ class TicketRepository(ABC):
         """본인 티켓만 조회한다. 없거나 남의 티켓이면 None."""
 
     # 중복발급 검사
+    # 개수는 여기서 세고, 수량과 비교하는 판단은 유스케이스가 한다
     @abstractmethod
-    async def exists_by_reservation_and_performance(
-        self, reservation_id: int, performance_id: int
-    ) -> bool:
-        """같은 예매/회차에 티켓이 이미 있는지 확인"""
+    async def count_by_reservation_id(self, reservation_id: int) -> int:
+        """예매에 이미 발급된 티켓 수를 반환한다. 취소된 티켓도 포함해서 센다."""
 
     # ----목록/집계
 
