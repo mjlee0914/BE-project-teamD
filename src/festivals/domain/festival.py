@@ -57,7 +57,7 @@ class Festival:
     @staticmethod
     def _validate_period(starts_on:date, ends_on: date) -> None:
         if starts_on >= ends_on:
-            raise InvalidFestivalPeriod("축제 시작일은 종료일보다 빨라야 합니다.")
+            raise InvalidFestivalPeriod()
 
 
     # 규칙 5/6번: 상태 계산
@@ -79,7 +79,7 @@ class Festival:
     # 아니면 : canceled_at=now
     def cancel(self, now: datetime) -> None:
         if self.canceled_at is not None:
-            raise FestivalAlreadyCanceled("이미 취소된 축제입니다.")
+            raise FestivalAlreadyCanceled()
         else:
             self.canceled_at = now
 
