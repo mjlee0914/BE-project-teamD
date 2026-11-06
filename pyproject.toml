@@ -29,3 +29,11 @@ build-backend = "uv_build"
 dev = [
     "ruff>=0.17.3",
 ]
+
+[tool.ruff]
+# 파일을 직접 지정해서 실행해도 exclude 설정을 적용
+force-exclude = true
+
+[tool.ruff.format]
+# 회원 domain은 섹션 주석("""...""") 바로 아래 빈 줄 없이 쓰는 스타일 유지 → ruff format 제외 (ruff check는 그대로 적용)
+exclude = ["src/users/domain/*.py"]
