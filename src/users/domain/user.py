@@ -1,6 +1,11 @@
 """
-요구 사항 정의
+# user.py
+- 회원 도메인 엔티티
+- 회원 한 명을 나타내는 클래스와 회원 규칙을 정의하는 파일
+- FastAPI, SQLAlchemy를 import 하지 않는 순수 파이썬 코드
+- DB 저장은 repository가, 요청 처리 순서는 application/service.py 가 담당
 
+# 요구 사항 정의
 [이메일]
 1. 이메일은 유효한 형식이어야 한다.
 2. 이메일은 앞뒤 공백을 제거하고 소문자로 정규화해 저장한다. (로그인 일관성)
@@ -8,7 +13,7 @@
 
 [이름·비밀번호]
 4. 이름은 2자 이상 20자 이하여야 한다.
-5. 이름은 앞뒤 공백을 제거하고 공백 기입이 불가능하다.
+5. 이름은 앞뒤, 중간 공백을 제거하며 공백 기입이 불가능하다.
 6. 비밀번호는 8자 이상이며 영문·숫자·특수문자(@$!%*#?&)를 각각 1개 이상 포함하고, 이 문자들로만 구성한다.
 7. 비밀번호 원문은 저장하지 않고 bcrypt 해시만 저장한다. (해싱은 PasswordHasher에 맡긴다)
 
@@ -44,10 +49,10 @@ from dataclasses import dataclass
 # 탈퇴 시각 기록용 (UTC 기준)
 from datetime import UTC, datetime
 
-# enum
+# enums.py
 from users.domain.enums import UserRole, UserStatus
 
-# exceptions
+# exceptions.py
 from users.domain.exceptions import (
     InvalidEmail,
     InvalidName,
@@ -57,7 +62,7 @@ from users.domain.exceptions import (
     WithdrawPermissionDenied,
 )
 
-# service
+# service.py
 from users.domain.service import PasswordHasher
 
 """이름 길이 제한"""
@@ -70,6 +75,7 @@ NAME_MAX_LENGTH = 20  # 이름 최대 길이 (규칙 4)
 # [\w\.-]+    : 도메인 이름 (예: gmail)
 # \.\w+$      : 마지막은 .com, .kr 같은 최상위 도메인
 EMAIL_REGEX = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
+
 """비밀번호 유효 형식 지정"""
 # (?=.*[A-Za-z])  : 영문이 최소 1개 있는지 미리 확인 (전방탐색, 문자를 소비하지 않음)
 # (?=.*\d)        : 숫자 최소 1개
@@ -78,6 +84,7 @@ EMAIL_REGEX = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
 PASSWORD_REGEX = re.compile(
     r"^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$"
 )
+
 """전화번호 유효 형식 지정"""
 # 01[016789] : 010, 011, 016, 017, 018, 019로 시작
 # \d{7,8}    : 뒤에 숫자 7~8자리 → 총 10~11자리
@@ -96,9 +103,9 @@ def normalize_email(email: str) -> str:
 """이름 공백 정규화"""
 
 
-# 이름 공백 제거 및 기입 불가
+# 이름의 모든 공백 제거 (ex: ' 홍 길동 ' → '홍길동')
 def normalize_name(name: str) -> str:
-    return name.strip()
+    return "".join(name.split())  # split(): 공백 기준으로 쪼갬 → join으로 붙임
 
 
 """전화번호 정규화"""
@@ -233,7 +240,7 @@ class User:
 
     @staticmethod
     def _validate_name(name: str) -> None:
-        # len()은 글자 수 기준 (한글 '홍길동' = 3), 앞뒤 공백도 글자 수에 포함됨
+        # len()은 글자 수 기준 (한글 '홍길동' = 3), normalize_name으로 공백을 모두 제거한 뒤 검사
         if not (NAME_MIN_LENGTH <= len(name) <= NAME_MAX_LENGTH):
             raise InvalidName(
                 f"이름은 {NAME_MIN_LENGTH}자 이상 {NAME_MAX_LENGTH}자 이하여야 합니다. [입력 길이 : {len(name)}]"
@@ -258,4 +265,4 @@ class User:
         # normalize_phone으로 하이픈을 제거한 값을 받는다는 전제
         # 010/011/016~019로 시작하는 10~11자리 숫자만 통과 (+82 같은 국제 형식은 거부)
         if not PHONE_REGEX.match(phone):
-            raise InvalidPhone(f"올바른 전화번호 형식이 아닙니다. [입력: {phone}]")
+            raise InvalidPhone(f"올바른 전화번호 형식이 아닙니다. [입력 : {phone}]")

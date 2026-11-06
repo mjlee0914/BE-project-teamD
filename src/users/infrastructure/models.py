@@ -6,7 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.core.models import Base
 
-# from user.domain.user import User
+# enums.py
 from users.domain.enums import UserRole, UserStatus
 
 
