@@ -35,8 +35,19 @@
 16. 이미 탈퇴한 회원은 다시 탈퇴할 수 없다.
 17. 탈퇴는 행을 지우지 않고 status=WITHDRAWN + deleted_at을 기록한다. (논리 삭제)
 
+[정보 수정]
+18. 회원 정보 수정은 이름과 전화번호만 가능하다. (email, role 수정 불가)
+19. 값이 들어온 항목만 수정하고, 들어오지 않은(None) 항목은 그대로 둔다.
+20. 수정하는 값도 생성 때와 같은 정규화, 검증을 거친다. (규칙 4, 5, 8)
+21. 탈퇴한(WITHDRAWN) 회원은 정보 수정이 불가하다.
+
+[상태 확인]
+22. 로그인, 예매는 ACTIVE 회원만 가능하다.
+23. ACTIVE가 아닌 회원이 이용하려 하면 도메인 오류가 발생한다. (SUSPENDED 정책 확정 전 임시 기준)
+
 [보류]
-- SUSPENDED 회원의 이용 범위, 진행 중인 예매가 있을 때 탈퇴 제한, 탈퇴 후 재가입
+- SUSPENDED 회원의 이용 범위(정보 수정, 수정 허용 여부), 진행 중인 예매가 있을 때 탈퇴 제한, 탈퇴 후 재가입
+- 전화번호 삭제(값을 비우는 수정)
 - 로그인 실패(401)는 auth 도메인에서 처리
 """
 
@@ -54,6 +65,7 @@ from users.domain.enums import UserRole, UserStatus
 
 # exceptions.py
 from users.domain.exceptions import (
+    InactiveUser,
     InvalidEmail,
     InvalidName,
     InvalidPassword,
@@ -108,7 +120,7 @@ def normalize_name(name: str) -> str:
     return "".join(name.split())  # split(): 공백 기준으로 쪼갬 → join으로 붙임
 
 
-"""전화번호 정규화"""
+"""전화번호 공백 정규화"""
 
 
 def normalize_phone(phone: str) -> str:
@@ -226,6 +238,39 @@ class User:
         # [6] 탈퇴 시각 기록: 서버 지역과 무관하게 UTC로 통일
         self.deleted_at = datetime.now(UTC)
 
+    """회원 정보 수정 비즈니스 로직"""
+
+    # email, role은 매개변수 자체가 없음 -> 수정 방법 없음 (규칙 18)
+    # updated_at은 직접 넣지 않음 -> DB의 onupdate=func.now()가 저장 시 기록
+    def update_profile(self, name: str | None = None, phone: str | None = None) -> None:
+        # [1] 탈퇴 회원일 경우 : 수정 불가 -> 409 (규칙 21)
+        if self.status == UserStatus.WITHDRAWN:
+            raise InvalidUserStatus(
+                f"탈퇴한 회원은 정보를 수정할 수 없습니다. [현재 상태: {self.status}]"
+            )
+        # [2] 이름 : 값이 들어온 경우만 정규화 -> 검증 -> 반영 (규칙 19, 20)
+        # 검증을 통과한 뒤에 self에 넣어야 실패 시 기존 값 유지 가능
+        if name is not None:
+            new_name = normalize_name(name)  # 새 이름 공백 정규화 검사
+            self._validate_name(new_name)  # 새 이름 형식 검증
+            self.name = new_name  # 기존 이름을 새 이름으로 교체
+
+        # [3] 전화번호 : 이름과 방식 동일 (규칙 19, 20)
+        # 중복 확인(규칙 9)은 DB 조회가 필요해서 service에서 find_by_phone으로 처리
+        if phone is not None:
+            new_phone = normalize_phone(phone)  # 새 전화번호 공백 정규화 검사
+            self._validate_phone(new_phone)  # 새 전화번호 형식 검증
+            self.phone = new_phone  # 기존 전화번호를 새 전화번호로 교체
+
+    """회원 상태 확인"""
+
+    # @property : 메서드를 속성처럼 user.is_active로 사용 (괄호 없음)
+    # True/False만 알려주는 "질문" -> 조건 분기가 필요한 곳에서 사용
+    @property
+    def is_active(self) -> bool:
+        # ACTIVE만 True, SUSPENDED, WITHDRAWN은 False (규칙 22)
+        return self.status == UserStatus.ACTIVE
+
     """이메일 형식 검증"""
 
     # @staticmethod: self/cls가 필요 없는 순수 검사 함수 → 클래스 안에 두어 응집도 유지
@@ -266,3 +311,13 @@ class User:
         # 010/011/016~019로 시작하는 10~11자리 숫자만 통과 (+82 같은 국제 형식은 거부)
         if not PHONE_REGEX.match(phone):
             raise InvalidPhone(f"올바른 전화번호 형식이 아닙니다. [입력 : {phone}]")
+
+    """회원 상태 검사"""
+
+    # ACTIVE가 아니면 예외를 던지는 "검사" -> 로그인 검증, 예매 시작 전에 한 줄로 사용
+    # ex) user.ensure_active() -> 통과하면 아무 일도 없음
+    def ensure_active(self) -> None:
+        if not self.is_active:
+            raise InactiveUser(
+                f"ACTIVE 상태의 회원만 이용할 수 있습니다. [현재 상태 : {self.status}]"
+            )
