@@ -19,6 +19,6 @@ class TokenPayload:
 @dataclass(frozen=True)
 class BlacklistToken:
     """로그아웃으로 사용을 차단한 토큰 한 개의 정보."""
-    
+
     jti: str
     user_id: int
