@@ -102,8 +102,9 @@ class SqlalchemyReservationRepository(ReservationRepository):
 
     # 예매 저장
     async def save(self, reservation: Reservation) -> Reservation:
-        _Reservation = await self.session.get(ReservationModel, reservation.id)
-        if _Reservation:  # 예매가 존재하면 수정
+        if reservation.id is not None:  # 예매가 존재하면 수정
+            _Reservation = await self.session.get(ReservationModel, reservation.id)
+
             _Reservation.status = reservation.status
             _Reservation.confirmed_at = reservation.confirmed_at
             _Reservation.canceled_at = reservation.canceled_at
