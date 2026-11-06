@@ -235,18 +235,15 @@ class User:
             raise InvalidUserStatus(
                 f"탈퇴한 회원은 정보를 수정할 수 없습니다. [현재 상태: {self.status}]"
             )
-        # [2] 이름 : 값이 들어온 경우만 정규화 -> 검증 -> 반영 (규칙 19, 20)
-        # 검증을 통과한 뒤에 self에 넣어야 실패 시 기존 값 유지 가능
-        if name is not None:
-            new_name = normalize_name(name)  # 새 이름 공백 정규화 검사
-            self._validate_name(new_name)  # 새 이름 형식 검증
-            self.name = new_name  # 기존 이름을 새 이름으로 교체
-
-        # [3] 전화번호 : 이름과 방식 동일 (규칙 19, 20)
+        # [2] 이름 / 전화번호 : 값이 들어온 경우만 정규화 -> 검증 -> 반영 (규칙 19, 20)
         # 중복 확인(규칙 9)은 DB 조회가 필요해서 service에서 find_by_phone으로 처리
-        if phone is not None:
+        # 검증을 통과한 뒤에 self에 넣어야 실패 시 기존 값 유지 가능
+        if not None in (name, phone):
+            new_name = normalize_name(name)  # 새 이름 공백 정규화 검사
             new_phone = normalize_phone(phone)  # 새 전화번호 공백 정규화 검사
+            self._validate_name(new_name)  # 새 이름 형식 검증
             self._validate_phone(new_phone)  # 새 전화번호 형식 검증
+            self.name = new_name  # 기존 이름을 새 이름으로 교체
             self.phone = new_phone  # 기존 전화번호를 새 전화번호로 교체
 
     """회원 상태 확인"""
