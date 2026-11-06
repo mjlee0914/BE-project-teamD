@@ -19,6 +19,14 @@ class InvalidReservationQuantity(UnprocessableException):
         super().__init__(message=message, error_code="INVALID_RESERVATION_QUANTITY")
 
 
+# 기존 예매와 신규 예매를 합산 시 인당 최대 구매 가능 수량의 범위를 벗어남 (규칙 9)
+class OverReservationQuantity(UnprocessableException):
+    def __init__(
+        self, message: str = "신규 예매로 인해 총 예매 가능 수량을 벗어납니다"
+    ):
+        super().__init__(message=message, error_code="OVER_RESERVATION_QUANTITY")
+
+
 # 처리 할 수 없는 금액 : 총 결제 금액이 음수, 할인 금액이 음수 (규칙 6, 7, 8)
 class InvalidReservationPrice(UnprocessableException):
     def __init__(self, message: str = "금액이 올바르지 않습니다."):
