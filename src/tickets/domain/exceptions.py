@@ -1,4 +1,5 @@
 # global exception import
+
 from shared.core.exceptions import (
     ConflictException,
     NotFoundException,
