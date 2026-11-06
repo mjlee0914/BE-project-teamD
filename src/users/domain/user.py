@@ -1,6 +1,11 @@
 """
-요구 사항 정의
+# user.py
+- 회원 도메인 엔티티
+- 회원 한 명을 나타내는 클래스와 회원 규칙을 정의하는 파일
+- FastAPI, SQLAlchemy를 import 하지 않는 순수 파이썬 코드
+- DB 저장은 repository가, 요청 처리 순서는 application/service.py 가 담당
 
+# 요구 사항 정의
 [이메일]
 1. 이메일은 유효한 형식이어야 한다.
 2. 이메일은 앞뒤 공백을 제거하고 소문자로 정규화해 저장한다. (로그인 일관성)
@@ -8,7 +13,7 @@
 
 [이름·비밀번호]
 4. 이름은 2자 이상 20자 이하여야 한다.
-5. 이름은 앞뒤 공백을 제거하고 공백 기입이 불가능하다.
+5. 이름은 앞뒤, 중간 공백을 제거하며 공백 기입이 불가능하다.
 6. 비밀번호는 8자 이상이며 영문·숫자·특수문자(@$!%*#?&)를 각각 1개 이상 포함하고, 이 문자들로만 구성한다.
 7. 비밀번호 원문은 저장하지 않고 bcrypt 해시만 저장한다. (해싱은 PasswordHasher에 맡긴다)
 
@@ -30,8 +35,19 @@
 16. 이미 탈퇴한 회원은 다시 탈퇴할 수 없다.
 17. 탈퇴는 행을 지우지 않고 status=WITHDRAWN + deleted_at을 기록한다. (논리 삭제)
 
+[정보 수정]
+18. 회원 정보 수정은 이름과 전화번호만 가능하다. (email, role 수정 불가)
+19. 값이 들어온 항목만 수정하고, 들어오지 않은(None) 항목은 그대로 둔다.
+20. 수정하는 값도 생성 때와 같은 정규화, 검증을 거친다. (규칙 4, 5, 8)
+21. 탈퇴한(WITHDRAWN) 회원은 정보 수정이 불가하다.
+
+[상태 확인]
+22. 로그인, 예매는 ACTIVE 회원만 가능하다.
+23. ACTIVE가 아닌 회원이 이용하려 하면 도메인 오류가 발생한다. (SUSPENDED 정책 확정 전 임시 기준)
+
 [보류]
-- SUSPENDED 회원의 이용 범위, 진행 중인 예매가 있을 때 탈퇴 제한, 탈퇴 후 재가입
+- SUSPENDED 회원의 이용 범위(정보 수정, 수정 허용 여부), 진행 중인 예매가 있을 때 탈퇴 제한, 탈퇴 후 재가입
+- 전화번호 삭제(값을 비우는 수정)
 - 로그인 실패(401)는 auth 도메인에서 처리
 """
 
@@ -44,11 +60,12 @@ from dataclasses import dataclass
 # 탈퇴 시각 기록용 (UTC 기준)
 from datetime import UTC, datetime
 
-# enum
+# enums.py
 from users.domain.enums import UserRole, UserStatus
 
-# exceptions
+# exceptions.py
 from users.domain.exceptions import (
+    InactiveUser,
     InvalidEmail,
     InvalidName,
     InvalidPassword,
@@ -57,7 +74,7 @@ from users.domain.exceptions import (
     WithdrawPermissionDenied,
 )
 
-# service
+# service.py
 from users.domain.service import PasswordHasher
 
 """이름 길이 제한"""
@@ -70,6 +87,7 @@ NAME_MAX_LENGTH = 20  # 이름 최대 길이 (규칙 4)
 # [\w\.-]+    : 도메인 이름 (예: gmail)
 # \.\w+$      : 마지막은 .com, .kr 같은 최상위 도메인
 EMAIL_REGEX = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
+
 """비밀번호 유효 형식 지정"""
 # (?=.*[A-Za-z])  : 영문이 최소 1개 있는지 미리 확인 (전방탐색, 문자를 소비하지 않음)
 # (?=.*\d)        : 숫자 최소 1개
@@ -78,6 +96,7 @@ EMAIL_REGEX = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
 PASSWORD_REGEX = re.compile(
     r"^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$"
 )
+
 """전화번호 유효 형식 지정"""
 # 01[016789] : 010, 011, 016, 017, 018, 019로 시작
 # \d{7,8}    : 뒤에 숫자 7~8자리 → 총 10~11자리
@@ -85,25 +104,17 @@ PASSWORD_REGEX = re.compile(
 PHONE_REGEX = re.compile(r"^01[016789]\d{7,8}$")
 
 """이메일 소문자 정규화"""
-
-
 # 중복 가입 방지, 로그인 일관성
 def normalize_email(email: str) -> str:
     # 앞뒤 공백 제거 + 소문자 (ex: ' A@B.com ' → 'a@b.com')
     return email.strip().lower()
 
-
 """이름 공백 정규화"""
-
-
-# 이름 공백 제거 및 기입 불가
+# 이름의 모든 공백 제거 (ex: ' 홍 길동 ' → '홍길동')
 def normalize_name(name: str) -> str:
-    return name.strip()
+    return "".join(name.split())  # split(): 공백 기준으로 쪼갬 → join으로 붙임
 
-
-"""전화번호 정규화"""
-
-
+"""전화번호 공백 정규화"""
 def normalize_phone(phone: str) -> str:
     # 하이픈, 공백 제거 -> 숫자만 남김 (ex: 010-1234-5678 -> 01012345678)
     # DB에 한 가지 형식으로만 저장 → 중복 검사(UNIQUE)가 정확해짐
@@ -131,7 +142,6 @@ class User:
     deleted_at: datetime | None = None
 
     """입력값 정규화 + 형식 검증"""
-
     # 객체 생성 직후 자동 실행 (생성 시점에 불변식 보장)
     def __post_init__(self):
         # 이메일 정규화(공백 제거, 소문자)
@@ -148,7 +158,6 @@ class User:
             self._validate_phone(self.phone)
 
     """회원가입 비즈니스 로직"""
-
     # classmethod : 인스턴스 없이 User.create(...) 호출, cls = User
     @classmethod
     def create(
@@ -170,7 +179,6 @@ class User:
         )
 
     """비밀번호 변경 비즈니스 로직"""
-
     def change_password(
         self, old_password: str, new_password: str, hasher: PasswordHasher
     ) -> None:
@@ -197,7 +205,6 @@ class User:
         self.password_hash = hasher.hash(new_password)
 
     """회원 탈퇴(소프트 삭제) 비즈니스 로직"""
-
     # requester: 탈퇴를 '요청한 사람' (self = 탈퇴 '대상')
     # 소프트 삭제 : 실제 DELETE 대신 상태값만 바꿈 → 예매 내역 등 연관 데이터 보존
     def withdraw(self, requester: "User") -> None:
@@ -219,8 +226,35 @@ class User:
         # [6] 탈퇴 시각 기록: 서버 지역과 무관하게 UTC로 통일
         self.deleted_at = datetime.now(UTC)
 
-    """이메일 형식 검증"""
+    """회원 정보 수정 비즈니스 로직"""
+    # email, role은 매개변수 자체가 없음 -> 수정 방법 없음 (규칙 18)
+    # updated_at은 직접 넣지 않음 -> DB의 onupdate=func.now()가 저장 시 기록
+    def update_profile(self, name: str | None = None, phone: str | None = None) -> None:
+        # [1] 탈퇴 회원일 경우 : 수정 불가 -> 409 (규칙 21)
+        if self.status == UserStatus.WITHDRAWN:
+            raise InvalidUserStatus(
+                f"탈퇴한 회원은 정보를 수정할 수 없습니다. [현재 상태: {self.status}]"
+            )
+        # [2] 이름 / 전화번호 : 값이 들어온 경우만 정규화 -> 검증 -> 반영 (규칙 19, 20)
+        # 중복 확인(규칙 9)은 DB 조회가 필요해서 service에서 find_by_phone으로 처리
+        # 검증을 통과한 뒤에 self에 넣어야 실패 시 기존 값 유지 가능
+        if not None in (name, phone):
+            new_name = normalize_name(name)  # 새 이름 공백 정규화 검사
+            new_phone = normalize_phone(phone)  # 새 전화번호 공백 정규화 검사
+            self._validate_name(new_name)  # 새 이름 형식 검증
+            self._validate_phone(new_phone)  # 새 전화번호 형식 검증
+            self.name = new_name  # 기존 이름을 새 이름으로 교체
+            self.phone = new_phone  # 기존 전화번호를 새 전화번호로 교체
 
+    """회원 상태 확인"""
+    # @property : 메서드를 속성처럼 user.is_active로 사용 (괄호 없음)
+    # True/False만 알려주는 "질문" -> 조건 분기가 필요한 곳에서 사용
+    @property
+    def is_active(self) -> bool:
+        # ACTIVE만 True, SUSPENDED, WITHDRAWN은 False (규칙 22)
+        return self.status == UserStatus.ACTIVE
+
+    """이메일 형식 검증"""
     # @staticmethod: self/cls가 필요 없는 순수 검사 함수 → 클래스 안에 두어 응집도 유지
     @staticmethod
     # 이름 앞 '_' : 클래스 내부 전용(private 관례)
@@ -230,17 +264,15 @@ class User:
             raise InvalidEmail(f"올바른 이메일 형식이 아닙니다. [입력 : {email}]")
 
     """이름 형식 검증"""
-
     @staticmethod
     def _validate_name(name: str) -> None:
-        # len()은 글자 수 기준 (한글 '홍길동' = 3), 앞뒤 공백도 글자 수에 포함됨
+        # len()은 글자 수 기준 (한글 '홍길동' = 3), normalize_name으로 공백을 모두 제거한 뒤 검사
         if not (NAME_MIN_LENGTH <= len(name) <= NAME_MAX_LENGTH):
             raise InvalidName(
                 f"이름은 {NAME_MIN_LENGTH}자 이상 {NAME_MAX_LENGTH}자 이하여야 합니다. [입력 길이 : {len(name)}]"
             )
 
     """비밀번호 형식 검증"""
-
     @staticmethod
     def _validate_password(raw_password: str) -> None:
         # 평문 기준 검사 → create(가입)와 change_password(변경)에서 공통 사용
@@ -252,10 +284,18 @@ class User:
             )
 
     """전화번호 형식 검증"""
-
     @staticmethod
     def _validate_phone(phone: str) -> None:
         # normalize_phone으로 하이픈을 제거한 값을 받는다는 전제
         # 010/011/016~019로 시작하는 10~11자리 숫자만 통과 (+82 같은 국제 형식은 거부)
         if not PHONE_REGEX.match(phone):
-            raise InvalidPhone(f"올바른 전화번호 형식이 아닙니다. [입력: {phone}]")
+            raise InvalidPhone(f"올바른 전화번호 형식이 아닙니다. [입력 : {phone}]")
+
+    """회원 상태 검사"""
+    # ACTIVE가 아니면 예외를 던지는 "검사" -> 로그인 검증, 예매 시작 전에 한 줄로 사용
+    # ex) user.ensure_active() -> 통과하면 아무 일도 없음
+    def ensure_active(self) -> None:
+        if not self.is_active:
+            raise InactiveUser(
+                f"ACTIVE 상태의 회원만 이용할 수 있습니다. [현재 상태 : {self.status}]"
+            )
