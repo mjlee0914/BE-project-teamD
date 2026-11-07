@@ -1,22 +1,19 @@
-from enum import Enum
 from datetime import datetime
-from sqlalchemy import CheckConstraint, ForeignKey, DateTime, String, BigInteger, Integer, Enum as SQLEnum, func
+from sqlalchemy import UniqueConstraint, CheckConstraint, ForeignKey, DateTime, String, BigInteger, Integer, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column
-from shared.core.models import Base
+from shared.core.models import Base, DateTimeMixin
+from performances.domain.enums import PerformanceStatus
 
-class PerformanceStatus(str, Enum):
-    SCHEDULED = "SCHEDULED"
-    OPEN = "OPEN"
-    SOLD_OUT = "SOLD_OUT"
-    CANCELED = "CANCELED"
-    COMPLETED = "COMPLETED"
-
-class Performance(Base):
+class Performance(DateTimeMixin, Base):
     __tablename__ = "performances"
 
+    # 테이블 전체의 규칙을 모아두는 튜플
+    # 컬럼 이름은 문자열로 적는다
     __table_args__ = (
         CheckConstraint(
+            # 체크할 제약
             "starts_at < ends_at",
+            # 규칙 이름표
             name="ck_performances_start_before_end",
         ),
         CheckConstraint(
@@ -55,6 +52,21 @@ class Performance(Base):
             "booking_open_at <= cancellation_deadline_at",
             name="ck_performances_cancellation_after_booking_open",
         ),
+        UniqueConstraint(
+            # UniqueConstraint=겹치면 안된다는 규칙.
+            # 인덱스: 규칙을 빨리 검사하려고 DB가 만드는 정리된 목록
+            # --> UniqueConstraint를 사용하면 인덱스가 자동으로 같이 만들어짐. (PostgreSQL 기준)
+            # --> 나중에 페스티벌별 정리된 목록 조회시에도 사용 가능
+            
+            # festival_id와 title 컬럼을 묶어서 이미 있는 다른 공연들의 쌍과 비교한다.
+            # 같은 페스티벌-다른 타이틀 ok.
+            # 다른 페스티벌-같은 타이틀 ok.
+            # 제약조건에 걸리면 DB가 IntegrityError를 던짐 
+            # → repository/service에서 잡아서 ConflictException(409)로 변환할 것
+            "festival_id",
+            "title",
+            name="uq_performances_festival_title",
+        ),
     )
 
     id: Mapped[int] = mapped_column(
@@ -67,11 +79,12 @@ class Performance(Base):
         ForeignKey("festivals.id"),
         nullable=False,
         )
-    
+
+    # 회차명 (ERD 기준) - 화면에 보여줄 이름. 예: "1회차", "DAY 1 - 헤드라이너"
+    # 같은 페스티벌 내에서만 중복 안되도록 설정 (A페스티벌 1/2회차, B페스티벌 1/2회차)
     title: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
-        unique=True
         )
     
     starts_at: Mapped[datetime] = mapped_column(
@@ -126,17 +139,6 @@ class Performance(Base):
         nullable=False,
     )
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False
-        )
-    
-    updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        onupdate=func.now(), 
-        nullable=True,
-        )
     
     status : Mapped[PerformanceStatus] = mapped_column(
         SQLEnum(
