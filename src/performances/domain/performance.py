@@ -4,6 +4,7 @@ Performance 규칙
 [기본 정보]
 1. 공연은 반드시 하나의 축제(festival_id)에 소속되어야 한다.
 2. 공연 제목은 1자 이상 50자 이하로 구성되어야 한다.
+   (같은 축제 안 제목 중복 금지는 규칙 20 참고)
 
 [일정]
 3. 공연 시작 시각은 종료 시각보다 반드시 빨라야 한다.
@@ -69,6 +70,15 @@ Performance 규칙
     - 차감 결과가 0이면 SOLD_OUT으로 바꾼다.
     - SOLD_OUT 상태에서 복구되면 OPEN으로 되돌린다.
     - 잔여 수량은 0 미만이 되거나 수용 인원을 넘을 수 없다. (규칙 8)
+
+[제목 중복]
+20. 같은 축제 안에서는 공연 제목이 중복될 수 없다. (409)
+    다른 축제의 공연과는 제목이 같아도 된다.
+    ex) A 축제 "1회차", B 축제 "1회차" → 허용
+        A 축제 안에 "1회차" 두 개 → 불가
+    엔티티 혼자서는 다른 공연을 알 수 없으므로 __post_init__에서 검사하지 않는다.
+    → service가 repository.exists_duplicated_title()로 확인 후 PerformanceTitleDuplicated를 던진다.
+    (DB의 uq_performances_festival_title 제약이 마지막 안전장치)
 """
 
 from dataclasses import dataclass
