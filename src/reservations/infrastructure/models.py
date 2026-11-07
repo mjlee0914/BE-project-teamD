@@ -12,7 +12,7 @@ from sqlalchemy import (
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
-from reservations.domain.enums import ReservationStatus, TicketType
+from reservations.domain.enums import DiscountType, ReservationStatus, TicketType
 from shared.core.models import Base
 
 
@@ -67,6 +67,11 @@ class Reservation(Base):
     discount_amount: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0
     )  # 할인 금액, 스냅샷
+    discount_type: Mapped[DiscountType] = mapped_column(
+        SQLEnum(DiscountType, native_enum=False, create_constraint=True, length=20),
+        default=DiscountType.NONE,
+        nullable=False,
+    )  # 할인 타입 [NONE, DISABLED, VETERAN, SENIOR, KANT]
     final_price: Mapped[int] = mapped_column(
         Integer, nullable=False
     )  # 최종 결제 금액, 스냅샷

@@ -32,8 +32,3 @@ class ReservationRepository(ABC):
         self, user_id: int
     ) -> list[Reservation]:  # 사용자 한 명은 여러 개의 예매를 가질 수 있음
         """로그인한 사용자의 모든 예매 조회"""
-
-    @abstractmethod
-    async def FestivalReader(
-        self, FestivalReader : 
-    )
