@@ -1,16 +1,28 @@
-from fastapi import Depends, APIRouter, Query
-from shared.core.schemas import APIResponse, PageResponse
-from festivals.presentation.schemas import FestivalCreate, FestivalResponse, FestivalUpdate
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query
+
 from festivals.application.service import FestivalService
 from festivals.presentation.dependencies import get_festival_service
+from festivals.presentation.schemas import (
+    FestivalCreate,
+    FestivalResponse,
+    FestivalUpdate,
+)
+from shared.core.schemas import APIResponse, PageResponse
 
 router = APIRouter(prefix="/festivals", tags=["festivals"])
+
+# FastAPI가 넣어주는 service (FastAPI가 wiring 등록부를 보고 진짜 service를 넣어준다.)
+# Annotated[타입, Depends(...)]: 타입은 FestivalService, 값은 FastAPI가 Depends로 채움
+# 기본값 자리(= Depends(...))에 쓰지 않으므로 ruff B008 경고가 나지 않고, 5개 API에서 같은 이름으로 재사용
+FestivalServiceDep = Annotated[FestivalService, Depends(get_festival_service)]
 
 # 축제 생성
 @router.post("", status_code=201, response_model=APIResponse[FestivalResponse])
 async def create_festival(
     body: FestivalCreate, # 사용자가 보낸 JSON, FestivalCreate 스키마로 검사한 뒤 넣어준다. (형식 틀리면 함수 실행 전 422)
-    service: FestivalService = Depends(get_festival_service) # FastAPI가 넣어주는 service(FastAPI가 wiring 등록부를 보고 진짜 service를 넣어준다.)
+    service: FestivalServiceDep,
 ):
     # body에 값을 하나씩 꺼내서 넘김.
     # 엔티티 검사, 겹침 검사, 저장은 전부 서비스에서
@@ -33,9 +45,11 @@ async def create_festival(
 # PageResponse로 받는다.
 @router.get("", response_model=APIResponse[PageResponse[FestivalResponse]])
 async def list_festivals(
-    page: int = Query(1, ge=1),
-    size: int = Query(10, ge=1, le=100),
-    service: FestivalService = Depends(get_festival_service)
+    service: FestivalServiceDep,
+    # Annotated[타입, Query(검사 규칙)] = 기본값
+    # 기본값이 없는 service가 기본값이 있는 page·size보다 앞에 와야 함 (파이썬 인자 순서 규칙)
+    page: Annotated[int, Query(ge=1)] = 1,
+    size: Annotated[int, Query(ge=1, le=100)] = 10,
 ):
     
     festivals, total = await service.list_festivals(page, size)
@@ -54,7 +68,7 @@ async def list_festivals(
 @router.get("/{festival_id}", response_model=APIResponse[FestivalResponse])
 async def get_festival(
     festival_id: int,
-    service: FestivalService = Depends(get_festival_service)
+    service: FestivalServiceDep,
 ):
     festival = await service.get_festival(festival_id)
     return APIResponse.ok(data=FestivalResponse.model_validate(festival))
@@ -64,7 +78,7 @@ async def get_festival(
 async def update_festival(
     festival_id: int,
     body: FestivalUpdate,
-    service: FestivalService = Depends(get_festival_service)
+    service: FestivalServiceDep,
 ):
     festival = await service.update_festival(
         festival_id=festival_id,
@@ -80,7 +94,7 @@ async def update_festival(
 @router.post("/{festival_id}/cancel", response_model=APIResponse[FestivalResponse])
 async def cancel_festival(
     festival_id: int,
-    service: FestivalService = Depends(get_festival_service)
+    service: FestivalServiceDep,
 ):
     festival = await service.cancel_festival(
         festival_id=festival_id
