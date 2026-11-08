@@ -1,5 +1,5 @@
 """
-# repository.py
+# domain/repository.py
 반드시 가져야 할 메서드 목록을 정의하는 추상 클래스
 메서드 이름, 인자 타입, 반환 타입만 존재하며 구현은 없음
 service.py는 이 클래스 타입만 보고 코드를 작성

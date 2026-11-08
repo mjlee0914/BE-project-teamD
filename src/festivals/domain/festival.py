@@ -7,6 +7,7 @@ Festival 규칙
 3. 축제 설명은 필수가 아니며, 설명이 없는 경우 None으로 관리한다.
 4. 축제 시작일은 종료일보다 반드시 빨라야 한다.
    시작일과 종료일이 같은 하루짜리 축제는 허용하지 않는다.
+   starts_on, ends_on은 한국(KST) 기준 날짜이다.
 5. 축제 상태는 별도 컬럼으로 저장하지 않고 starts_on, ends_on,
    canceled_at과 현재 날짜를 기준으로 계산한다.
    - 현재 날짜 < starts_on: SCHEDULED
@@ -60,7 +61,7 @@ class Festival:
             raise InvalidFestivalPeriod()
 
 
-    # 규칙 5/6번: 상태 계산
+    # 규칙 5/6번: 상태 계산 -> 상태를 저장하지 않고 status(today)로 계산
     # 오늘 날짜를 인자로 받음
     # 안에서 date.today()를 부르면 테스트할 때 날짜를 바꿀 수 없음
     # canceled_at 확인을 제일 먼저 함 (규칙 6)
