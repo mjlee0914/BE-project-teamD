@@ -1,8 +1,12 @@
+from dataclasses import asdict
+from datetime import datetime
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query
 
 from festivals.application.service import FestivalService
+from festivals.domain.festival import Festival
 from festivals.presentation.dependencies import get_festival_service
 from festivals.presentation.schemas import (
     FestivalCreate,
@@ -11,12 +15,27 @@ from festivals.presentation.schemas import (
 )
 from shared.core.schemas import APIResponse, PageResponse
 
+KST = ZoneInfo("Asia/Seoul")
+
+
 router = APIRouter(prefix="/festivals", tags=["festivals"])
 
 # FastAPI가 넣어주는 service (FastAPI가 wiring 등록부를 보고 진짜 service를 넣어준다.)
 # Annotated[타입, Depends(...)]: 타입은 FestivalService, 값은 FastAPI가 Depends로 채움
 # 기본값 자리(= Depends(...))에 쓰지 않으므로 ruff B008 경고가 나지 않고, 5개 API에서 같은 이름으로 재사용
 FestivalServiceDep = Annotated[FestivalService, Depends(get_festival_service)]
+
+# 응답 만드는 helper 함수
+# 축제 응답에 계산된 status가 들어갈 수 있도록 추가함.
+def _to_response(festival: Festival) -> FestivalResponse:
+    today = datetime.now(KST).date()
+
+    return FestivalResponse.model_validate(
+        {
+            **asdict(festival),
+            "status": festival.status(today)
+        }
+    )
 
 # 축제 생성
 @router.post("", status_code=201, response_model=APIResponse[FestivalResponse])
@@ -37,7 +56,7 @@ async def create_festival(
 
     # 엔티티를 응답 스키마로 바꿈.
     # APIResponse.ok(data=...)로 팀 공통 모양으로 응답 스키마 감싸기
-    return APIResponse.ok(data=FestivalResponse.model_validate(festival))
+    return APIResponse.ok(data=_to_response(festival))
 
 
 # 축제 목록 불러오기
@@ -56,8 +75,8 @@ async def list_festivals(
 
     # 리스트를 통째로 model_validate에 넣지 않고, for문으로 하나씩 꺼낸다.
     # list comprehension:
-    # festivals에서 하나씩 꺼내고, 그것을 .model_validate하여 하나씩 리스트로 담는다.
-    items = [FestivalResponse.model_validate(f) for f in festivals]
+    # festivals에서 하나씩 꺼내고, 그것을 _to_response하여 하나씩 리스트로 담는다.
+    items = [_to_response(f) for f in festivals]
     # PageResponse.create로 4개 값을 하나로 묶어 페이지 응답 하나를 만든다.
     page_data = PageResponse.create(items=items, total=total, page=page, size=size)
     
@@ -71,7 +90,7 @@ async def get_festival(
     service: FestivalServiceDep,
 ):
     festival = await service.get_festival(festival_id)
-    return APIResponse.ok(data=FestivalResponse.model_validate(festival))
+    return APIResponse.ok(data=_to_response(festival))
 
 # 축제 정보 수정
 @router.patch("/{festival_id}", response_model=APIResponse[FestivalResponse])
@@ -88,7 +107,7 @@ async def update_festival(
         starts_on=body.starts_on,
         ends_on=body.ends_on
     )
-    return APIResponse.ok(data=FestivalResponse.model_validate(festival))
+    return APIResponse.ok(data=_to_response(festival))
 
 # 축제 취소
 @router.post("/{festival_id}/cancel", response_model=APIResponse[FestivalResponse])
@@ -99,4 +118,5 @@ async def cancel_festival(
     festival = await service.cancel_festival(
         festival_id=festival_id
     )
-    return APIResponse.ok(data=FestivalResponse.model_validate(festival))
+    return APIResponse.ok(data=_to_response(festival))
+

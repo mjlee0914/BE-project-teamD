@@ -11,6 +11,7 @@
 
 from festivals.application.service import FestivalService
 
+
 def get_festival_service() -> FestivalService:
     # wiring에서 빠뜨리면 바로 알아채기 위해 에러 던짐
     # 조용히 None을 돌려주면 원인을 찾기 어려움
