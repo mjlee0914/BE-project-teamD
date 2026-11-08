@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-router = APIRouter(prefix="/tickets", tags=["tickests"])
+router = APIRouter(prefix="/tickets", tags=["tickets"])
 
 # 티켓 생성
 
