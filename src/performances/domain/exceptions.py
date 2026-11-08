@@ -1,4 +1,9 @@
-from shared.core.exceptions import UnprocessableException, ConflictException, NotFoundException
+from shared.core.exceptions import (
+    ConflictException,
+    NotFoundException,
+    UnprocessableException,
+)
+
 
 # 조회했는데 없을 때 (service에서 던짐)
 class PerformanceNotFound(NotFoundException):
@@ -29,3 +34,8 @@ class InvalidPerformancePrice(UnprocessableException):
 class InvalidPerformanceStatus(ConflictException):
     def __init__(self, message: str = "현재 상태에서는 변경할 수 없습니다."):
         super().__init__(message=message, error_code="INVALID_PERFORMANCE_STATUS")
+
+# 규칙 20 : 같은 축제 안 공연 제목 중복 - PerformanceTitleDuplicated
+class PerformanceTitleDuplicated(ConflictException):
+    def __init__(self, message: str="같은 축제 안에서 공연 이름은 중복될 수 없습니다."):
+        super().__init__(message=message, error_code="PERFORMANCE_TITLE_DUPLICATED")
