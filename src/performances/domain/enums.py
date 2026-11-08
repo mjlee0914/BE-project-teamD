@@ -1,5 +1,6 @@
 from enum import StrEnum
 
+
 class PerformanceStatus(StrEnum):
     SCHEDULED = "SCHEDULED"
     OPEN = "OPEN"
