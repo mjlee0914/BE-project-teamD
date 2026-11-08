@@ -18,7 +18,7 @@ from shared.core.schemas import APIResponse, PageResponse
 KST = ZoneInfo("Asia/Seoul")
 
 
-router = APIRouter(prefix="/festivals", tags=["festivals"])
+router = APIRouter(prefix="/v1/festivals", tags=["festivals"])
 
 # FastAPI가 넣어주는 service (FastAPI가 wiring 등록부를 보고 진짜 service를 넣어준다.)
 # Annotated[타입, Depends(...)]: 타입은 FestivalService, 값은 FastAPI가 Depends로 채움
