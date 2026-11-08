@@ -30,6 +30,12 @@ class InvalidTicketPerformanceTime(UnprocessableException):
         super().__init__(message=message, error_code="INVALID_TICKET_PERFORMANCE_TIME")
 
 
+# 현재 상태에서 허용되지 않은 상태변경
+class InvalidTicketStatus(ConflictException):
+    def __init__(self, message: str = "현재 상태에서는 처리할 수 없는 요청입니다."):
+        super().__init__(message=message, error_code="INVALID_TICKET_STATUS")
+
+
 # 취소할 수 없는 티켓
 class TicketNotCancelable(ConflictException):
     def __init__(self, message: str = "취소할 수 없는 티켓입니다."):
