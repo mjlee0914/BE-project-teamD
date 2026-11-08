@@ -3,11 +3,10 @@
 # 저장소를 생성자로 받고, 없으면 NotFound raise
 # 요청이 끝날 때 get_db가 commit한다.
 
-from datetime import UTC, date, datetime  # UTC, datetime -> cancel에서 사용
-
 from festivals.domain.exceptions import FestivalNotFound, FestivalPeriodOverlap
 from festivals.domain.festival import Festival
 from festivals.domain.repository import FestivalRepository
+from datetime import date, datetime, UTC # UTC, datetime -> cancel에서 사용
 
 
 class FestivalService:
@@ -43,7 +42,7 @@ class FestivalService:
             description=description
         )
 
-        # infrastructure 저장소
+        # 같은 장소, 기간 겹치는지 검사
         if await self._festival_repo.exists_overlapping(  
             festival.venue,
             festival.starts_on,
