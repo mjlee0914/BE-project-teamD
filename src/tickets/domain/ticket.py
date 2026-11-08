@@ -20,7 +20,7 @@
 
 [상태 변경]
 7. 예매가 확정되면 PENDING → ISSUED, issued_at을 기록한다.
-8. 취소하면 PENDING/ISSUED → CANCELED, canceled_at을 기록한다. (PENDING 취소 허용 여부는 팀 확인 필요)
+8. 취소하면 PENDING/ISSUED → CANCELED, canceled_at을 기록한다. 취소 마감 시각이 지나면 취소할 수 없다.
 9. 입장하면 ISSUED → USED, used_at을 기록한다.
 10. 공연 종료 후 미사용이면 ISSUED → EXPIRED.
 11. CANCELED, USED, EXPIRED는 끝난 상태라 다른 상태로 바꿀 수 없다.
