@@ -4,6 +4,7 @@ Performance 규칙
 [기본 정보]
 1. 공연은 반드시 하나의 축제(festival_id)에 소속되어야 한다.
 2. 공연 제목은 1자 이상 50자 이하로 구성되어야 한다.
+   (같은 축제 안 제목 중복 금지는 규칙 20 참고)
 
 [일정]
 3. 공연 시작 시각은 종료 시각보다 반드시 빨라야 한다.
@@ -57,7 +58,7 @@ Performance 규칙
 [수정]
 16. 일정 수정(PATCH) 시 전달되지 않은 값은 기존 값으로 채운 뒤,
     합쳐진 결과로 규칙 3~6을 다시 검증한다.
-17. 취소(CANCELED)되었거나 종료(COMPLETED)된 공연은 일정을 수정할 수 없다. (409) (TODO)
+17. 취소(CANCELED)되었거나 종료(COMPLETED)된 공연은 일정을 수정할 수 없다. (409)
 
 [예매]
 18. 공연은 아래 조건을 모두 만족할 때만 예매 가능하다. (is_bookable)
@@ -65,17 +66,33 @@ Performance 규칙
     - 잔여 수량이 1 이상이다.
     - 현재 시각이 예매 기간 안이다. (booking_open_at <= now < booking_close_at)
     현재 시각은 인자로 전달받는다. (테스트에서 시각을 고정하기 위함)
-19. 예매 시 잔여 수량을 차감하고, 예매 취소 시 복구한다. (TODO)
+19. 예매 시 잔여 수량을 차감하고, 예매 취소 시 복구한다.
     - 차감 결과가 0이면 SOLD_OUT으로 바꾼다.
     - SOLD_OUT 상태에서 복구되면 OPEN으로 되돌린다.
     - 잔여 수량은 0 미만이 되거나 수용 인원을 넘을 수 없다. (규칙 8)
+
+[제목 중복]
+20. 같은 축제 안에서는 공연 제목이 중복될 수 없다. (409)
+    다른 축제의 공연과는 제목이 같아도 된다.
+    ex) A 축제 "1회차", B 축제 "1회차" → 허용
+        A 축제 안에 "1회차" 두 개 → 불가
+    엔티티 혼자서는 다른 공연을 알 수 없으므로 __post_init__에서 검사하지 않는다.
+    → service가 repository.exists_duplicated_title()로 확인 후 PerformanceTitleDuplicated를 던진다.
+    (DB의 uq_performances_festival_title 제약이 마지막 안전장치)
 """
 
 from dataclasses import dataclass
-from datetime import datetime, date, timedelta
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
+
 from performances.domain.enums import PerformanceStatus
-from performances.domain.exceptions import InvalidPerformanceTime, InvalidPerformanceCapacity, InvalidPerformancePrice, InvalidPerformanceTitle, InvalidPerformanceStatus
+from performances.domain.exceptions import (
+    InvalidPerformanceCapacity,
+    InvalidPerformancePrice,
+    InvalidPerformanceStatus,
+    InvalidPerformanceTime,
+    InvalidPerformanceTitle,
+)
 
 # 규칙 6에서 공연 시각을 KST 기준 날짜로 변환하여 비교할 때 사용
 KST = ZoneInfo("Asia/Seoul")
@@ -155,10 +172,12 @@ class Performance:
             raise InvalidPerformanceTime("예매 시작 시각은 공연 시작 24시간 전보다 빨라야 합니다.")
 
     # 규칙 6
-    def validate_within_festival(
-            self, 
+    @staticmethod
+    def _validate_within_festival(
             festival_starts_on:date, 
-            festival_ends_on: date
+            festival_ends_on: date,
+            starts_at: datetime,
+            ends_at: datetime,
             ) -> None:
         # 공연 시각을 한국 달력 날짜로 바꿔서 축제 날짜와 같은 기준으로 맞춘다.
         # festival date: 시간대가 없음 -> 한국 날짜로 읽기로 약속
@@ -168,8 +187,8 @@ class Performance:
         # 변환 후:
         # astimezone(KST) -> 2026-11-06 01:00 KST
         # astimezone(KST).date() -> 2026-11-06
-        KST_starts_at = self.starts_at.astimezone(KST).date()
-        KST_ends_at = self.ends_at.astimezone(KST).date()
+        KST_starts_at = starts_at.astimezone(KST).date()
+        KST_ends_at = ends_at.astimezone(KST).date()
         if not (festival_starts_on <= KST_starts_at and KST_ends_at <= festival_ends_on):
             raise InvalidPerformanceTime("공연 일정은 축제 기간 안에 있어야 합니다.")
 
@@ -197,7 +216,7 @@ class Performance:
             capacity=capacity,
             price=price,
         )      
-        performance.validate_within_festival(festival_starts_on=festival_starts_on, festival_ends_on=festival_ends_on)
+        performance._validate_within_festival(festival_starts_on=festival_starts_on, festival_ends_on=festival_ends_on, starts_at=starts_at, ends_at=ends_at)
         
         return performance
     
@@ -225,11 +244,17 @@ class Performance:
 
     # 공연 날짜 수정(공연시작/종료시간, 예약오픈/마감시간, 취소데드라인)
     def change_schedule(self,
+                        festival_starts_on: date,
+                        festival_ends_on: date,
                         starts_at: datetime | None = None,
                         ends_at: datetime | None = None,
                         booking_open_at: datetime | None = None,
                         booking_close_at: datetime | None = None,
                         ) -> None:
+        # CANCELED, COMPLETED 공연은 일정 수정 불가 (규칙 17)
+        if self.status in (PerformanceStatus.CANCELED, PerformanceStatus.COMPLETED):
+            raise InvalidPerformanceStatus("취소되었거나 종료된 공연은 스케줄을 변경할 수 없습니다.")
+        
         # PATCH => change_schedule()에 인자로 넣는 값만 바꾸기
         # 바꾸지 않는 값은 원래 있던 값(self.)으로 넣기
         new_starts = starts_at if starts_at is not None else self.starts_at
@@ -238,49 +263,59 @@ class Performance:
         new_booking_close = booking_close_at if booking_close_at is not None else self.booking_close_at
         new_cancel_deadline = new_starts - CANCEL_DEADLINE_BEFORE_START
 
-        self._validate_schedule(new_starts, new_ends, new_booking_open, new_booking_close, new_cancel_deadline)
+        self._validate_schedule(starts_at=new_starts, ends_at=new_ends, booking_open_at=new_booking_open, booking_close_at=new_booking_close, cancel_deadline_at=new_cancel_deadline)
+        # 수정된 일정으로 축제 기간 재검사
+        self._validate_within_festival(festival_starts_on=festival_starts_on, festival_ends_on=festival_ends_on, starts_at=new_starts, ends_at=new_ends)
         self.starts_at = new_starts
         self.ends_at = new_ends
         self.booking_open_at = new_booking_open
         self.booking_close_at = new_booking_close
         self.cancel_deadline_at = new_cancel_deadline
-        # 상태 검사 추가 예정 TODO
-        # 축제 기간 검사 예정 TODO
 
     # 규칙 18 : 예매 가능 여부
     def is_bookable(self, now:datetime) -> bool:
-        # if self.stauts == PerformanceStatus.OPEN and self.remaining_count > 0 and self.booking_open_at <= now < self.booking_close_at:
-        #     return True
-        # else:
-        #     return False
         return (
             self.status == PerformanceStatus.OPEN and
             self.remaining_count > 0 and
             self.booking_open_at <= now < self.booking_close_at
         )
 
-    # 규칙 19
-    # TODO: 예매 시 잔여 수량 차감 (reservations 서비스에서 예매 생성 시 호출)
-    # 1. 상태 검사: OPEN이 아니면 InvalidPerformanceStatus (409)
-    # 2. 수량 검사: quantity <= 0 이거나 remaining_count보다 크면 InvalidPerformanceCapacity
-    # 3. remaining_count -= quantity
-    # 4. 차감 후 remaining_count == 0 이면 status = SOLD_OUT
-    #    ex) 잔여 10, 2장 예매 → 잔여 8, OPEN 유지
-    #        잔여 2,  2장 예매 → 잔여 0, SOLD_OUT으로 변경
-    # 참고: 동시 예매로 인한 재고 꼬임은 repository에서 처리 (version 낙관적 락 또는 원자적 UPDATE)
+    # 규칙 19: 예매시 잔여 좌석 차감
+    # 흐름(quantity를 인자로 받는 이유)
+    # 사용자가 "공연 5번 2장 예매" 요청
+    # ReservationService: "2장" 을 받음 (예매 정보는 지금 누가 몇장을 사려는지 알고 있음.)
+    # performance.decrease_remaining(2) 로 인자 넘겨줌.
     def decrease_remaining(self, quantity: int) -> None:
-        pass
+        # 1. 오픈한 공연만 잔여 좌석 차감
+        if self.status != PerformanceStatus.OPEN:
+            raise InvalidPerformanceStatus("예매 가능한 공연이 아닙니다.")
+        # 2. 0장 이하는 예매 안됨 or 잔여수량보다 더 많이 예매할 수 없음
+        if quantity <= 0 or quantity > self.remaining_count:
+            raise InvalidPerformanceCapacity("예매 수량이 잔여 수량 범위를 벗어났습니다.")
+        # 3. 잔여 수량 차감
+        self.remaining_count -= quantity
+        # 4. 잔여 수량이 0이 되면 매진 상태로 처리
+        if self.remaining_count == 0:
+            self.status = PerformanceStatus.SOLD_OUT
 
-    # 규칙 19
-    # TODO: 예매 취소 시 잔여 수량 복구 (reservations 서비스에서 예매 취소 시 호출)
-    # 1. 상태 검사: OPEN, SOLD_OUT이 아니면 InvalidPerformanceStatus (409)
-    #    (CANCELED/COMPLETED 공연은 재고를 되돌릴 의미가 없음)
-    # 2. 수량 검사: quantity <= 0 이거나 remaining_count + quantity > capacity면 InvalidPerformanceCapacity
-    # 3. remaining_count += quantity
-    # 4. 복구 전 상태가 SOLD_OUT이었다면 status = OPEN (취소표가 생겨 다시 예매 가능)
-    #    ex) 잔여 0(SOLD_OUT), 2장 취소 → 잔여 2, OPEN으로 변경
+    # 규칙 19: 예매 취소 시 잔여 수량 복구 (reservations 서비스에서 예매 취소 시 호출)
     def increase_remaining(self, quantity: int) -> None:
-        pass
+        # 1. 상태 검사: OPEN, SOLD_OUT에 해당하지 않으면 InvalidPerformanceStatus (409)
+        #    (CANCELED/COMPLETED 공연은 재고를 되돌릴 의미가 없음)        
+        if self.status not in (PerformanceStatus.OPEN, PerformanceStatus.SOLD_OUT):
+            raise InvalidPerformanceStatus("취소되었거나 종료된 공연은 잔여 수량을 복구할 수 없습니다.")
+        
+        # 2. 0장 이하는 취소 안됨 or 잔여수량 + 취소수량이 capacity보다 클 수 없음
+        if quantity <= 0 or self.remaining_count + quantity > self.capacity:
+            raise InvalidPerformanceCapacity("복구 수량이 수용 인원 범위를 벗어났습니다.")
+
+        # 3. 잔여 수량 increase
+        self.remaining_count += quantity
+        # 4. 복구 전 상태가 SOLD_OUT이었다면 status = OPEN (취소표가 생겨 다시 예매 가능)
+        #    ex) 잔여 0(SOLD_OUT), 2장 취소 → 잔여 2, OPEN으로 변경
+        if self.status == PerformanceStatus.SOLD_OUT:
+            self.status = PerformanceStatus.OPEN
+        
 
 
         

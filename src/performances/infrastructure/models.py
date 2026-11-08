@@ -1,8 +1,20 @@
 from datetime import datetime
-from sqlalchemy import UniqueConstraint, CheckConstraint, ForeignKey, DateTime, String, BigInteger, Integer, Enum as SQLEnum
+
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column
-from shared.core.models import Base, DateTimeMixin
+
 from performances.domain.enums import PerformanceStatus
+from shared.core.models import Base, DateTimeMixin
+
 
 class Performance(DateTimeMixin, Base):
     __tablename__ = "performances"
@@ -33,24 +45,20 @@ class Performance(DateTimeMixin, Base):
             name="ck_performances_remaining_lte_capacity",
         ),
         CheckConstraint(
-            "max_tickets_per_user > 0",
-            name="ck_performances_max_tickets_positive",
+            "price > 0",
+            name="ck_performances_price_positive",
         ),
         CheckConstraint(
-            "price >= 0",
-            name="ck_performances_price_nonnegative",
-        ),
-        CheckConstraint(
-            "cancellation_deadline_at <= starts_at",
-            name="ck_performances_cancellation_before_start",
+            "cancel_deadline_at <= starts_at",
+            name="ck_performances_cancel_before_start",
         ),
         CheckConstraint(
             "booking_close_at <= starts_at",
             name="ck_performances_booking_close_before_start",
         ),
         CheckConstraint(
-            "booking_open_at <= cancellation_deadline_at",
-            name="ck_performances_cancellation_after_booking_open",
+            "booking_open_at <= cancel_deadline_at",
+            name="ck_performances_cancel_after_booking_open",
         ),
         UniqueConstraint(
             # UniqueConstraint=겹치면 안된다는 규칙.
@@ -107,7 +115,7 @@ class Performance(DateTimeMixin, Base):
         nullable=False
     )
 
-    cancellation_deadline_at: Mapped[datetime] = mapped_column(
+    cancel_deadline_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False
     )
@@ -120,11 +128,6 @@ class Performance(DateTimeMixin, Base):
     remaining_count: Mapped[int] = mapped_column(
         Integer,
         nullable=False
-    )
-
-    max_tickets_per_user: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
     )
 
     price:Mapped[int] = mapped_column(
