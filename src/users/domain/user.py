@@ -22,7 +22,7 @@
 9. 전화번호는 중복될 수 없다. (중복 확인은 application(service)에서 한다)
 
 [상태·역할]
-10. 상태는 ACTIVE / SUSPENDED / WITHDRAWN 이며, 새 회원은 항상 ACTIVE다.
+10. 상태는 ACTIVE / WITHDRAWN 이며, 새 회원은 항상 ACTIVE다.
 11. 역할은 USER / ADMIN 이며, 새 회원은 항상 USER다. email·role은 회원 정보 수정으로 바꿀 수 없다.
 12. 탈퇴한(WITHDRAWN) 회원은 비밀번호를 변경할 수 없다.
 
@@ -32,7 +32,7 @@
 
 [탈퇴]
 15. 탈퇴는 본인 또는 ADMIN만 할 수 있다.
-16. 이미 탈퇴한 회원은 다시 탈퇴할 수 없다.
+16. 이미 탈퇴한 회원은 다시 탈퇴할 수 없으며, 재가입이 불가하다. (탈퇴 후에도 행이 남아 이메일 중복 확인(규칙 3)에 걸린다)
 17. 탈퇴는 행을 지우지 않고 status=WITHDRAWN + deleted_at을 기록한다. (논리 삭제)
 
 [정보 수정]
@@ -43,10 +43,10 @@
 
 [상태 확인]
 22. 로그인, 예매는 ACTIVE 회원만 가능하다.
-23. ACTIVE가 아닌 회원이 이용하려 하면 도메인 오류가 발생한다. (SUSPENDED 정책 확정 전 임시 기준)
+23. ACTIVE가 아닌(WITHDRAWN) 회원이 이용하려 하면 도메인 오류가 발생한다.
+24. 진행 중인 예매가 있을 경우 탈퇴가 불가하다. (예매 조회가 필요하므로 application(service)에서 확인한다)
 
 [보류]
-- SUSPENDED 회원의 이용 범위(정보 수정, 수정 허용 여부), 진행 중인 예매가 있을 때 탈퇴 제한, 탈퇴 후 재가입
 - 전화번호 삭제(값을 비우는 수정)
 - 로그인 실패(401)는 auth 도메인에서 처리
 """
@@ -251,7 +251,7 @@ class User:
     # True/False만 알려주는 "질문" -> 조건 분기가 필요한 곳에서 사용
     @property
     def is_active(self) -> bool:
-        # ACTIVE만 True, SUSPENDED, WITHDRAWN은 False (규칙 22)
+        # ACTIVE만 True, WITHDRAWN은 False (규칙 22)
         return self.status == UserStatus.ACTIVE
 
     # [이메일 형식 검증]
