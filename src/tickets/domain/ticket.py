@@ -88,19 +88,19 @@ class Ticket:
 
     # 결제 확인 후 티켓 발급 pending -> issued
     def confirm(self, now: datetime) -> None:  # 값을 돌려주지 않고 자기 자신을 바꿈
-        if self.status != TicketStatus.Pending:
+        if self.status != TicketStatus.PENDING:
             raise InvalidTicketStatus("결제 대기 상태의 티켓만 발급할 수 있습니다.")
         self.status = TicketStatus.ISSUED  # 객체 안 값이 직접 수정됨.
         self.issued_at = now
 
-    # 취소 pending/issed -> canceled
+    # 취소 pending/issued -> canceled
     def cancel(self, now: datetime) -> None:
         if self.status in self._FINAL_STATUSES:
             raise TicketNotCancelable("이미 처리가 끝난 티켓은 취소할 수 없습니다.")
         if now > self.cancel_deadline_at:
             raise TicketNotCancelable("취소 가능한 기간이 지났습니다.")
         self.status = TicketStatus.CANCELED
-        self.canceld_at = now
+        self.canceled_at = now
 
     # 입장 issued -> entered
     def enter(self, now: datetime) -> None:
