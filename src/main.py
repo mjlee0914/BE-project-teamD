@@ -14,7 +14,7 @@ FastAPI 앱의 시작점
 from fastapi import FastAPI
 
 # 프로젝트 코드
-from reservations.presentation.router import router as reservation_router
+from reservations.presentation.routers.v1.router import router as reservation_router
 from shared.core.exception_handlers import register_exception_handlers
 from users.presentation.routers.v1.router import router as user_router
 from wiring import wire_dependencies
