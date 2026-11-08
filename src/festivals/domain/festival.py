@@ -62,6 +62,7 @@ class Festival:
         self._validate_period(self.starts_on, self.ends_on)
         self.name = self._normalize_text(self.name, InvalidFestivalName)
         self.venue = self._normalize_text(self.venue, InvalidFestivalVenue)
+        self.description = self._normalize_description(self.description)
 
     # 축제기간 검증용
     @staticmethod
@@ -76,6 +77,17 @@ class Festival:
         if not (1 <= len(val) <= 50):
             raise error()
         return val 
+
+    # 축제 설명 정리용
+    @staticmethod
+    def _normalize_description(des: str | None) -> str | None:
+        if not des:
+            return None
+        des = des.strip()
+        if not des:
+            return None
+        else:
+            return des
 
     # 규칙 5/6번: 상태 계산 -> 상태를 저장하지 않고 status(today)로 계산
     # 오늘 날짜를 인자로 받음
@@ -132,11 +144,7 @@ class Festival:
         if description is None:
             new_description = self.description
         else:
-            stripped = description.strip()
-            if stripped == "": # 또는 if not stripped: 로 쓸 수 있다.
-                new_description = None
-            else: 
-                new_description = stripped
+            new_description = self._normalize_description(description)
 
         new_name = self._normalize_text(new_name, InvalidFestivalName)
         new_venue = self._normalize_text(new_venue, InvalidFestivalVenue)
