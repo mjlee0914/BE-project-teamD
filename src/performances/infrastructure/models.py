@@ -135,13 +135,15 @@ class Performance(DateTimeMixin, Base):
         nullable=False
     )
 
-    # 낙관적 락 수정 예정.
+    # 낙관적 락 번호표: UPDATE 때 WHERE version=? 비교 후 +1 (SQLAlchemy가 자동 처리)
     version:Mapped[int] = mapped_column(
         Integer,
         default=1,
         nullable=False,
     )
 
+    # version 비교용
+    __mapper_args__ = {"version_id_col": version} # noqa: RUF012 (SQLAlchemy 공식 설정 방식)
     
     status : Mapped[PerformanceStatus] = mapped_column(
         SQLEnum(
