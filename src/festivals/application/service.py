@@ -3,18 +3,28 @@
 # 저장소를 생성자로 받고, 없으면 NotFound raise
 # 요청이 끝날 때 get_db가 commit한다.
 
-from festivals.domain.exceptions import FestivalNotFound, FestivalPeriodOverlap
+from datetime import UTC, date, datetime  # UTC, datetime -> cancel에서 사용
+
+from festivals.domain.exceptions import (
+    FestivalHasPerformanceOutsidePeriod,
+    FestivalNotFound,
+    FestivalPeriodOverlap,
+)
 from festivals.domain.festival import Festival
 from festivals.domain.repository import FestivalRepository
-from datetime import date, datetime, UTC # UTC, datetime -> cancel에서 사용
+from performances.domain.enums import PerformanceStatus
+from performances.domain.performance import KST
+from performances.domain.repository import PerformanceRepository
 
 
 class FestivalService:
     def __init__(
             self,
-            festival_repo: FestivalRepository
+            festival_repo: FestivalRepository,
+            performance_repo: PerformanceRepository,
     ) -> None:
         self._festival_repo = festival_repo
+        self._performance_repo = performance_repo
 
     # 페스티벌 꺼내기
     async def get_festival(self, festival_id: int) -> Festival:
@@ -89,7 +99,19 @@ class FestivalService:
             exclude_id=festival_id
         ):
             raise FestivalPeriodOverlap()
-        # TODO: 줄어든 기간 밖에 공연이 있는지 검사
+        
+        # 줄어든 기간 밖에 공연이 있는지 검사
+        # count로 공연 개수 세기
+        count = await self._performance_repo.count_by_festival(festival_id)
+        # 축제별 공연 가져오기
+        performances = await self._performance_repo.find_all_by_festival(festival_id=festival_id, offset=0, limit=count)
+        for p in performances:
+            if p.status == PerformanceStatus.CANCELED:
+                continue
+            start_day = p.starts_at.astimezone(KST).date()
+            end_day = p.ends_at.astimezone(KST).date()
+            if not (festival.starts_on <= start_day and end_day <= festival.ends_on):
+                raise FestivalHasPerformanceOutsidePeriod()
 
         # 저장
         return await self._festival_repo.save(festival)

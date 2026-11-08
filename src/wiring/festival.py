@@ -1,16 +1,23 @@
-from fastapi import FastAPI, Depends
+from typing import Annotated
+
+from fastapi import Depends, FastAPI
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.core.database import get_db
 from festivals.application.service import FestivalService
 from festivals.infrastructure.repositories import SqlAlchemyFestivalRepository
 from festivals.presentation.dependencies import get_festival_service
+from performances.infrastructure.repositories import SqlAlchemyPerformanceRepository
+from shared.core.database import get_db
+
 
 def build_festival_service(
-    session: AsyncSession = Depends(get_db),
+    session: Annotated[AsyncSession, Depends(get_db)],  # get_db가 요청마다 세션을 넣어줌
 ) -> FestivalService:
-    return FestivalService(
-        SqlAlchemyFestivalRepository(session)
+    return FestivalService( 
+        # 저장소 2개를 같은 세션으로
+        # -> 한 요청이 하나의 트랜잭션이어야 get_db가 한꺼번에 commit/rollback 가능
+        SqlAlchemyFestivalRepository(session),
+        SqlAlchemyPerformanceRepository(session)
     )
     
 def wire_festival_dependencies(app: FastAPI) -> None:
