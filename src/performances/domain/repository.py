@@ -60,7 +60,7 @@ class PerformanceRepository(ABC):
         id = None이면 새로 생성
         있으면 기존 행을 수정함
         DB가 채운 id, created_at 등이 반영된 Performance 반환
-        commit은 하지 않음 (service가 담당함)
+        commit은 하지 않음 (요청 단위 세션(get_db)에서 처리)
         """
 
     @abstractmethod
