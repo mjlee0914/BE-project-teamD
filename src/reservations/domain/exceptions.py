@@ -48,3 +48,8 @@ class DepositDeadlineViolation(ConflictException):
 class ReservationNotAvailable(ConflictException):
     def __init__(self, message: str = "현재 예매할 수 없습니다."):
         super().__init__(message=message, error_code="RESERVATION_NOT_AVAILABLE")
+
+
+class CancelDeadlineViolation(ConflictException):
+    def __init__(self, message: str = "예매 취소 기간을 벗어났습니다."):
+        super().__init__(message=message, error_code="CANCEL_DEADLINE_VIOLATION")
