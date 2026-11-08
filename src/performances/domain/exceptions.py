@@ -39,3 +39,8 @@ class InvalidPerformanceStatus(ConflictException):
 class PerformanceTitleDuplicated(ConflictException):
     def __init__(self, message: str="같은 축제 안에서 공연 이름은 중복될 수 없습니다."):
         super().__init__(message=message, error_code="PERFORMANCE_TITLE_DUPLICATED")
+
+# 낙관적 락: 조회한 뒤 저장하기 전에 다른 요청이 먼저 공연을 수정함 (version 불일치) - PerformanceVersionConflict
+class PerformanceVersionConflict(ConflictException):
+    def __init__(self, message: str = "공연 정보가 변경되어 요청을 처리할 수 없습니다. 다시 시도해 주세요."):
+        super().__init__(message=message, error_code="PERFORMANCE_VERSION_CONFLICT")

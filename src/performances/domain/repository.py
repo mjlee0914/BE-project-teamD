@@ -61,6 +61,9 @@ class PerformanceRepository(ABC):
         있으면 기존 행을 수정함
         DB가 채운 id, created_at 등이 반영된 Performance 반환
         commit은 하지 않음 (요청 단위 세션(get_db)에서 처리)
+        수정할 때는 find_by_id 등으로 "꺼내서 → 고치고 → save" 순서로 사용
+        (꺼낼 때의 version으로 동시 수정 충돌을 검사함)
+        다른 요청이 먼저 수정했으면 PerformanceVersionConflict(409)
         """
 
     @abstractmethod
