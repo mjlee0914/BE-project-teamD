@@ -230,45 +230,81 @@ class ReservationService:
 
     # --- 조회 유스케이스 ---
     # 로그인한 사용자의 예매 단건 가져오기
+    # - 라우터의 GET /{reservation_id}와 취소 유스케이스에서 함께 사용
+    #   → "있는 예매인지 + 내 예매인지" 확인을 한 곳에서만 하기 위해 재사용
     async def get_my_reservation(
         self, reservation_id: int, user_id: int
     ) -> Reservation:
+        # ① 예매 조회 : 저장소는 없으면 None을 돌려줌 (예외를 던지지 않음)
         user_reservation = await self._reservation_repo.find_by_id(reservation_id)
 
+        # ② 없는 예매 → 404
         if user_reservation is None:
             raise ReservationNotFound()
 
+        # ③ 남의 예매 → 403이 아니라 똑같이 404
+        # - 403(권한 없음)으로 응답하면 "그 번호의 예매가 존재한다"는 사실이 드러남
+        #   → 남의 예매 번호를 하나씩 넣어 보며 존재 여부를 알아내는 걸 막기 위해 404로 통일
         if user_reservation.user_id != user_id:
             raise ReservationNotFound()
 
         return user_reservation
 
     # 로그인한 사용자의 전체 예매 가져오기
+    # - 예매가 하나도 없으면 저장소가 빈 리스트 []를 돌려줌 → 예외 없이 그대로 반환
+    #   → 라우터에서 200 + 빈 리스트로 응답 (목록 자원은 있고 항목이 0개일 뿐이므로 404 아님)
+    # - 상태(PENDING/CONFIRMED/CANCELED/EXPIRED)와 상관없이 전부 반환
     async def get_my_reservations(self, user_id: int) -> list[Reservation]:
         user_reservations = await self._reservation_repo.find_by_user_id(user_id)
 
         return user_reservations
 
     # --- 취소 유스케이스 ---
+    # 예매 취소 흐름
+    # ① 예매 조회        → 없거나 남의 예매면 404 (get_my_reservation 재사용)
+    # ② 회차 조회        → 예매 생성 때와 같은 기준으로 티켓 종류에 맞는 회차를 다시 고름
+    # ③ 취소 마감 확인   → 입금 완료(CONFIRMED) 예매만 검사, 지났으면 409
+    # ④ 예매 상태 변경   → cancel() : CANCELED로 바꾸고 canceled_at 기록 (이미 끝난 예매면 409)
+    # ⑤ 잔여 수량 복구   → 회차마다 quantity만큼 되돌리고 저장
+    # ⑥ 예매 저장·반환
+    # - 중간에 예외가 나면 요청 세션이 rollback 되므로 ⑤의 복구도 함께 취소됨
     async def cancel_reservation(
         self, reservation_id: int, user_id: int
     ) -> Reservation:
+        # ① 예매 조회 (본인 확인 포함)
         selected_reservation = await self.get_my_reservation(reservation_id, user_id)
+
+        # ② 회차 조회
+        # - 예매에는 회차 id가 없고 festival_id + ticket_type만 있음 (#79)
+        #   → 생성 때와 같은 공통 메서드로 회차를 다시 찾는다 (양일권이면 토·일 2개)
         selected_performance = await self._find_target_performance(
             selected_reservation.festival_id, selected_reservation.ticket_type
         )
 
+        # 현재 시각 (UTC) : 취소 마감 시각과 "시각끼리" 비교하므로 KST로 바꿀 필요 없음
         now = datetime.now(UTC)
 
+        # ③ 취소 마감 확인
+        # - PENDING(입금 전) 예매는 돈이 오가지 않았으므로 마감과 상관없이 취소 가능
+        # - CONFIRMED(입금 완료) 예매만 회차의 cancel_deadline_at 이전에 취소 가능
+        # - 양일권이면 토·일 중 하나라도 마감이 지나면 취소 불가 (부분 취소 없음)
         if selected_reservation.status == ReservationStatus.CONFIRMED:
             for performance in selected_performance:
                 if now > performance.cancel_deadline_at:
                     raise CancelDeadlineViolation()
 
+        # ④ 예매 상태 변경
+        # - 상태 변경 규칙은 엔티티가 판단 (CANCELED·EXPIRED 예매를 다시 취소하면 엔티티가 409)
         selected_reservation.cancel()
 
+        # ⑤ 잔여 수량 복구
+        # - 예매 생성 때 decrease_remaining으로 줄였던 수량을 그대로 되돌림
+        # - SOLD_OUT이던 회차는 복구 후 OPEN으로 바뀜 (공연 엔티티가 처리)
+        # - 회차가 취소·종료 상태면 공연 엔티티가 409를 던짐 → 끝난 공연의 예매는 취소 불가
+        # - 엔티티 값만 바꾸면 DB에 반영되지 않으므로 공연 저장소로 저장까지 해야 함
         for performance in selected_performance:
             performance.increase_remaining(selected_reservation.quantity)
             await self._performance_repo.save(performance)
 
+        # ⑥ 예매 저장 후 반환 : 저장 결과(canceled_at 등이 반영된 예매)를 라우터에 돌려줌
         return await self._reservation_repo.save(selected_reservation)
