@@ -129,12 +129,17 @@ class SqlAlchemyFestivalRepository(FestivalRepository):
         return _to_domain(model)
 
     async def exists_overlapping(self, venue: str, starts_on: date, ends_on: date, exclude_id: int | None = None)-> bool:
-        stmt = select(func.count()).select_from(FestivalModel).where(
+        stmt = select(func.count()).select_from(FestivalModel).where( # func.count() = COUNT(*)
                 FestivalModel.venue == venue, # 같은 장소
-                FestivalModel.canceled_at.is_(None), # 취소된 축제 제외
+                FestivalModel.canceled_at.is_(None), # 취소된 축제 제외 (canceled_At IS NULL)
                 FestivalModel.starts_on <= ends_on, # 하루 겹침도 막기
                 FestivalModel.ends_on >= starts_on
             )
+
+        # 수정 중인 축제의 DB에 저장된 원래 버전(수정 전 기간)과 비교하면 안됨.
+        # 자기 자신은 비교 대상에서 빠져야 함.
+        # 다른 축제와 겹칠 때만 True
+        # exclude_id가 None일 때면 DB에 없는 상태이므로 계산하면 안됨. not None일 때만 체크
         if exclude_id is not None:
             stmt = stmt.where(
                 FestivalModel.id != exclude_id
