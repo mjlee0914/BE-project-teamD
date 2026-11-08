@@ -25,9 +25,15 @@ Festival 규칙
     공연 일정은 소속 축제의 시작일과 종료일 범위 안에 있어야 한다.
 """
 from dataclasses import dataclass
-from datetime import datetime, date
-from festivals.domain.exceptions import FestivalAlreadyCanceled, InvalidFestivalPeriod
+from datetime import date, datetime
+
 from festivals.domain.enums import FestivalStatus
+from festivals.domain.exceptions import (
+    FestivalAlreadyCanceled,
+    InvalidFestivalName,
+    InvalidFestivalPeriod,
+    InvalidFestivalVenue,
+)
 
 
 @dataclass
@@ -49,17 +55,27 @@ class Festival:
     canceled_at: datetime | None = None
 
     # 규칙을 메서드로
-    # 4번: 시작 < 종료 
+    # 규칙 1, 2, 4
     # 객체 생성시 dataclass로 __init__ 필드 다 채운 뒤 자동 검증
     # -> 잘못된 축제가 아예 존재 불가능함
     def __post_init__(self):
         self._validate_period(self.starts_on, self.ends_on)
+        self.name = self._normalize_text(self.name, InvalidFestivalName)
+        self.venue = self._normalize_text(self.venue, InvalidFestivalVenue)
 
+    # 축제기간 검증용
     @staticmethod
     def _validate_period(starts_on:date, ends_on: date) -> None:
         if starts_on >= ends_on:
             raise InvalidFestivalPeriod()
 
+    # 축제이름, 축제장소 검증용
+    @staticmethod
+    def _normalize_text(val:str, error: type[Exception]) -> str:
+        val = val.strip()
+        if not (1 <= len(val) <= 50):
+            raise error()
+        return val 
 
     # 규칙 5/6번: 상태 계산 -> 상태를 저장하지 않고 status(today)로 계산
     # 오늘 날짜를 인자로 받음
@@ -92,10 +108,39 @@ class Festival:
             starts_on: date | None = None,
             ends_on: date | None = None,
     ) -> None:
+        if self.canceled_at is not None:
+            raise FestivalAlreadyCanceled("취소된 축제의 기간 정보는 바꿀 수 없습니다.")
         new_starts = starts_on if starts_on is not None else self.starts_on
         new_ends = ends_on if ends_on is not None else self.ends_on
 
         self._validate_period(new_starts, new_ends)
         self.starts_on=new_starts
         self.ends_on=new_ends
+
+    def change_info(
+            self,
+            name: str | None = None,
+            venue: str | None = None,
+            description: str | None = None
+    ) -> None:
+        if self.canceled_at is not None:
+            raise FestivalAlreadyCanceled("취소된 축제의 정보는 바꿀 수 없습니다.")
+        
+        new_name = name if name is not None else self.name
+        new_venue = venue if venue is not None else self.venue
+
+        if description is None:
+            new_description = self.description
+        else:
+            stripped = description.strip()
+            if stripped == "": # 또는 if not stripped: 로 쓸 수 있다.
+                new_description = None
+            else: 
+                new_description = stripped
+
+        new_name = self._normalize_text(new_name, InvalidFestivalName)
+        new_venue = self._normalize_text(new_venue, InvalidFestivalVenue)
+        self.name = new_name
+        self.venue = new_venue
+        self.description = new_description
         
