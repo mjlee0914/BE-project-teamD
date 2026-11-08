@@ -25,9 +25,10 @@
 - 저장소는 flush까지만 하고, commit은 요청 단위 세션에서 처리
 - 중간에 예외가 나면 세션이 rollback 되므로 ⑦에서 줄인 잔여 수량도 함께 취소됨
 
-# 아직 다른 도메인에 의존하는 부분 (TODO)
-- PerformanceRepository.find_by_festival_id / save : 공연 담당 작업 예정
-- Performance.decrease_remaining : 공연 엔티티에서 아직 pass
+# 공연 도메인에 의존하는 부분 (PR #95, #93)
+- PerformanceRepository.count_by_festival / find_all_by_festival / save : 추상 메서드 정의됨, 구현체는 공연 담당 작업 예정
+- Performance.decrease_remaining : 구현됨 (OPEN이 아니거나 잔여보다 많으면 예외, 0이 되면 SOLD_OUT)
+- PR #95가 dev에 머지되기 전에는 이 파일을 import하면 PerformanceRepository가 없어 ImportError가 남
 """
 
 # 표준 라이브러리 : 현재 시각(UTC)과 한국 시간대 변환
@@ -129,7 +130,13 @@ class ReservationService:
         # - 예매는 축제(festival_id)를 가리키고, 어느 회차인지는 티켓 종류로 정해진다
         #   (양일권은 예매 1건이 토·일 두 회차를 포함하기 때문, #79)
         # - 그래서 축제의 회차를 전부 가져온 뒤 요일로 골라낸다
-        performances = await self._performance_repo.find_by_festival_id(festival_id)
+        # - 공연 저장소(#93)에는 페이지네이션이 있는 목록 조회(find_all_by_festival)만 있음
+        #   → 축제의 회차 개수를 먼저 세고(count_by_festival), 그 개수만큼 한 번에 가져온다
+        #     (offset=0 : 처음부터, limit=회차 개수 : 전부)
+        performance_count = await self._performance_repo.count_by_festival(festival_id)
+        performances = await self._performance_repo.find_all_by_festival(
+            festival_id, offset=0, limit=performance_count
+        )
 
         # 티켓 종류에 필요한 요일 목록 ex) SAT → [5], BOTH → [5, 6]
         performance_day = WEEKDAY[ticket_type]
