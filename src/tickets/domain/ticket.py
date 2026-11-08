@@ -20,7 +20,7 @@
 
 [상태 변경]
 7. 예매가 확정되면 PENDING → ISSUED, issued_at을 기록한다.
-8. 취소하면 ISSUED → CANCELED, canceled_at을 기록한다. (PENDING 취소 허용 여부는 팀 확인 필요)
+8. 취소하면 PENDING/ISSUED → CANCELED, canceled_at을 기록한다. (PENDING 취소 허용 여부는 팀 확인 필요)
 9. 입장하면 ISSUED → USED, used_at을 기록한다.
 10. 공연 종료 후 미사용이면 ISSUED → EXPIRED.
 11. CANCELED, USED, EXPIRED는 끝난 상태라 다른 상태로 바꿀 수 없다.
@@ -79,47 +79,47 @@ class Ticket:
                 "공연 종료 시각은 시작 시각보다 뒤여야 합니다"
             )
 
-        # 끝난 상태: 더 이상 상태 변경 없음
-        _FINAL_STATUSES = (
-            TicketStatus.CANCELED,
-            TicketStatus.USED,
-            TicketStatus.EXPIRED,
-        )
+    # 끝난 상태: 더 이상 상태 변경 없음
+    _FINAL_STATUSES = (
+        TicketStatus.CANCELED,
+        TicketStatus.USED,
+        TicketStatus.EXPIRED,
+    )
 
-        # 결제 확인 후 티켓 발급 pending -> issued
-        def confirm(self, now: datetime) -> None:  # 값을 돌려주지 않고 자기 자신을 바꿈
-            if self.status != TicketStatus.Pending:
-                raise InvalidTicketStatus("결제 대기 상태의 티켓만 발급할 수 있습니다.")
-            self.status = TicketStatus.ISSUED  # 객체 안 값이 직접 수정됨.
-            self.issued_at = now
+    # 결제 확인 후 티켓 발급 pending -> issued
+    def confirm(self, now: datetime) -> None:  # 값을 돌려주지 않고 자기 자신을 바꿈
+        if self.status != TicketStatus.Pending:
+            raise InvalidTicketStatus("결제 대기 상태의 티켓만 발급할 수 있습니다.")
+        self.status = TicketStatus.ISSUED  # 객체 안 값이 직접 수정됨.
+        self.issued_at = now
 
-        # 취소 pending/issed -> canceled
-        def canceled(self, now: datetime) -> None:
-            if self.status in self._FINAL_STATUSES:
-                raise TicketNotCancelable("이미 처리가 끝난 티켓은 취소할 수 없습니다.")
-            if now > self.cancel_deadline_at:
-                raise TicketNotCancelable("취소 가능한 기간이 지났습니다.")
-            self.status = TicketStatus.CANCELED
-            self.canceld_at = now
+    # 취소 pending/issed -> canceled
+    def cancel(self, now: datetime) -> None:
+        if self.status in self._FINAL_STATUSES:
+            raise TicketNotCancelable("이미 처리가 끝난 티켓은 취소할 수 없습니다.")
+        if now > self.cancel_deadline_at:
+            raise TicketNotCancelable("취소 가능한 기간이 지났습니다.")
+        self.status = TicketStatus.CANCELED
+        self.canceld_at = now
 
-        # 입장 issued -> entered
-        def enter(self, now: datetime) -> None:
-            if self.status != TicketStatus.ISSUED:
-                raise TicketNotEnterable("발급된 티켓만 입장할 수 있습니다.")
-            if (
-                now.astimezone(KST).date()
-                != self.performance_start_at.astimezone(KST).date()
-            ):
-                raise TicketNotEnterable("공연 당일에만 입장할 수 있습니다.")
-            if now >= self.performance_end_at:
-                raise TicketNotEnterable("이미 종료된 공연입니다")
-            self.status = TicketStatus.USED
-            self.used_at = now
+    # 입장 issued -> entered
+    def enter(self, now: datetime) -> None:
+        if self.status != TicketStatus.ISSUED:
+            raise TicketNotEnterable("발급된 티켓만 입장할 수 있습니다.")
+        if (
+            now.astimezone(KST).date()
+            != self.performance_start_at.astimezone(KST).date()
+        ):
+            raise TicketNotEnterable("공연 당일에만 입장할 수 있습니다.")
+        if now >= self.performance_end_at:
+            raise TicketNotEnterable("이미 종료된 공연입니다")
+        self.status = TicketStatus.USED
+        self.used_at = now
 
-        # 만료 issued -> expired
-        def expire(self, now: datetime) -> None:
-            if self.status != TicketStatus.ISSUED:
-                raise InvalidTicketStatus("발급된 티켓만 만료 처리할 수 있습니다.")
-            if now < self.performance_end_at:
-                raise InvalidTicketStatus("공연이 끝난 뒤에 만료 처리할 수 있습니다.")
-            self.status = TicketStatus.EXPIRED
+    # 만료 issued -> expired
+    def expire(self, now: datetime) -> None:
+        if self.status != TicketStatus.ISSUED:
+            raise InvalidTicketStatus("발급된 티켓만 만료 처리할 수 있습니다.")
+        if now < self.performance_end_at:
+            raise InvalidTicketStatus("공연이 끝난 뒤에 만료 처리할 수 있습니다.")
+        self.status = TicketStatus.EXPIRED
