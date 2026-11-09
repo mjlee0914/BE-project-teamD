@@ -5,6 +5,7 @@
 # SqlAlchemyPerformanceRepository(SQL, infrastructure)
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 
 from performances.domain.performance import Performance
 
@@ -77,4 +78,23 @@ class PerformanceRepository(ABC):
         exclude_id를 넘기지 않으면 제목을 그대로 두고 수정할 때 자기 자신을 중복으로 착각함
         True면 service가 PerformanceTitleDuplicated(409)를 던짐
         DB의 uq_performances_festival_title은 동시 요청 대비 마지막 안전장치로 유지
+        """
+
+    @abstractmethod
+    async def exists_uncanceled_by_festival(self, festival_id: int) -> bool:
+        """
+        축제에 CANCELED가 아닌 공연이 있는지 EXISTS로 확인
+        COMPLETED도 포함
+        True면 FestivalHasUncanceledPerformances(409)
+        공연이 없으면 False
+        """
+
+    @abstractmethod
+    async def exists_outside_period(self, festival_id: int, period_start: datetime, period_end: datetime) -> bool:
+        """
+        취소가 되지 않은 공연 중 [period_start, period_end) 범위 밖에 있는 게 있으면 True
+        [시작 시간은 포함, 종료 시간은 미포함)
+        period_start = 축제 첫날 00:00 KST 포함 Ex) 11/10 00:00 시작 포함
+        period_end = 축제 마지막 날 다음 날 00:00 KST 미포함 Ex) 11/12 23:59에 끝나면 안, 11/13 00:00에 끝나면 밖
+        True면 service가 FestivalHasPerformanceOutsidePeriod(409)를 던짐
         """

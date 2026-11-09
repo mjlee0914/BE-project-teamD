@@ -102,14 +102,17 @@ class Festival:
         else:
             return FestivalStatus.COMPLETED
 
+    # 규칙 8: 이미 취소된 축제면 409 (cancel, 공연 생성에서 사용)
+    def ensure_not_canceled(self) -> None:
+        if self.canceled_at is not None:
+            raise FestivalAlreadyCanceled()
+
     # 규칙 7/8번: 취소
     # 이미 취소되었을 시 : FestivalAlreadyCanceled
     # 아니면 : canceled_at=now
     def cancel(self, now: datetime) -> None:
-        if self.canceled_at is not None:
-            raise FestivalAlreadyCanceled()
-        else:
-            self.canceled_at = now
+        self.ensure_not_canceled()
+        self.canceled_at = now
 
     # PATCH 용
     # None으로 온 값은 기존 값으로 채운 다음 검증

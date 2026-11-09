@@ -6,7 +6,6 @@ from performances.domain.performance import CANCEL_DEADLINE_BEFORE_START
 
 
 class PerformanceCreate(BaseModel):
-    festival_id: int = Field(gt=0)
     title: str = Field(min_length=1, max_length=50)
     starts_at: datetime
     ends_at: datetime
@@ -28,18 +27,18 @@ class PerformanceCreate(BaseModel):
         return self
 
 
-# 현재는 일정(공연 시작/종료, 예매 시작/종료)만 수정 가능 (Performance.change_schedule)
+# 일정과 수용 인원 수정 가능 (change_schedule, change_capacity)
 # 보내지 않은 값은 기존 값으로 채운 뒤 엔티티에서 규칙 3~6을 다시 검증하므로 (규칙 16)
 # 이 스키마에는 날짜 검증기를 두지 않는다.
-# TODO: 제목·수용 인원·가격 수정은 이후 추가 예정
+# TODO: 제목·가격 수정은 이후 추가 예정
 #   - title: 같은 축제 안 제목 중복 검사 필요 (규칙 20, exists_duplicated_title의 exclude_id 사용)
-#   - capacity: 이미 팔린 수량(capacity - remaining_count)보다 작게 줄일 수 없음, remaining_count 재계산 필요
 #   - price: 이미 예매된 건의 결제 금액과 어떻게 맞출지 결정 필요
 class PerformanceUpdate(BaseModel):
     starts_at: datetime | None = None
     ends_at: datetime | None = None
     booking_open_at: datetime | None = None
     booking_close_at: datetime | None = None
+    capacity: int | None = Field(default=None, gt=0)
 
 
 class PerformanceResponse(BaseModel):
@@ -59,3 +58,10 @@ class PerformanceResponse(BaseModel):
     updated_at: datetime | None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AvailabilityResponse(BaseModel):
+    performance_id: int
+    is_bookable: bool
+    status: str
+    remaining_count: int
