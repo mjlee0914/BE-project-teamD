@@ -14,13 +14,13 @@ FastAPI 앱의 시작점
 from fastapi import FastAPI
 
 # 프로젝트 코드
-from festivals.presentation.routers.v1.router import router as festival_router
-from performances.presentation.routers.v1.router import router as performance_router
 from reservations.presentation.routers.v1.router import router as reservation_router
 from shared.core.exception_handlers import register_exception_handlers
 from users.presentation.routers.v1.router import router as user_router
 
 # 라우터 작성 후 주석 해제
+from festivals.presentation.routers.v1.router import router as festival_router
+from performances.presentation.routers.v1.router import router as performance_router
 # from tickets.presentation.routers.v1.router import router as ticket_router
 # from auth.presentation.routers.v1.router import router as auth_router
 # from payments.presentation.routers.v1.router import router as payment_router
