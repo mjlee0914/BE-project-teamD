@@ -53,7 +53,7 @@ async def list_performances(
     festival_id: int,
     service: PerformanceServiceDep,
     page: Annotated[int, Query(ge=1)] = 1, # Query=엔드포인트 함수 인자의 숫자 검사기 역할. "1이상, 100 이하만 받는다" 없으면 서버가 그냥 계산하다 터짐.
-    size : Annotated[int, Query(ge=1, le=100)] = 100
+    size : Annotated[int, Query(ge=1, le=100)] = 10
 ):
     performances, total = await service.list_performances(festival_id=festival_id, page=page, size=size)
 
