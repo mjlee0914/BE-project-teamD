@@ -78,3 +78,12 @@ class PerformanceRepository(ABC):
         True면 service가 PerformanceTitleDuplicated(409)를 던짐
         DB의 uq_performances_festival_title은 동시 요청 대비 마지막 안전장치로 유지
         """
+
+    @abstractmethod
+    async def exists_uncanceled_by_festival(self, festival_id: int) -> bool:
+        """
+        축제에 CANCELED가 아닌 공연이 있는지 EXISTS로 확인
+        COMPLETED도 포함
+        True면 FestivalHasUncanceledPerformances(409)
+        공연이 없으면 False
+        """

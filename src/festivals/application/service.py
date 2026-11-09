@@ -6,14 +6,16 @@
 from datetime import UTC, date, datetime  # UTC, datetime -> cancel에서 사용
 
 from festivals.domain.exceptions import (
+    FestivalAlreadyCanceled,
     FestivalHasPerformanceOutsidePeriod,
+    FestivalHasUncanceledPerformances,
     FestivalNotFound,
     FestivalPeriodOverlap,
 )
 from festivals.domain.festival import Festival
 from festivals.domain.repository import FestivalRepository
-from performances.domain.enums import PerformanceStatus
 
+from performances.domain.enums import PerformanceStatus
 # TODO: KST 상수 통일 회의 후 shared로 교체 (#110 리뷰)
 from performances.domain.performance import KST
 from performances.domain.repository import PerformanceRepository
@@ -126,7 +128,15 @@ class FestivalService:
         # 꺼내기
         festival = await self.get_festival(festival_id)
 
+        # 이미 취소된 축제를 또 취소하면 에러
+        if festival.canceled_at is not None:
+            raise FestivalAlreadyCanceled()
+        
+        # 공연상태가 CANCELED가 아닌 공연이 존재하면 축제 취소 x
+        if await self._performance_repo.exists_uncanceled_by_festival(festival_id):
+            raise FestivalHasUncanceledPerformances()
+
         # 지금 시각을 만들어서 엔티티에 넘긴다.
         festival.cancel(datetime.now(UTC))
-        # TODO: 축제취소 시 소속 공연 처리(팀 결정 필요)
+
         return await self._festival_repo.save(festival)

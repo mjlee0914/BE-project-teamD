@@ -2,6 +2,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
+from performances.domain.enums import PerformanceStatus
 from performances.domain.exceptions import (
     PerformanceNotFound,
     PerformanceVersionConflict,
@@ -163,4 +164,12 @@ class SqlAlchemyPerformanceRepository(PerformanceRepository):
         stmt = select(inner.exists())
         result = await self._session.execute(stmt)
         return result.scalar()
-    
+
+    async def exists_uncanceled_by_festival(self, festival_id: int) -> bool:
+        inner = select(PerformanceModel.id).where(
+            PerformanceModel.festival_id == festival_id,
+            PerformanceModel.status != PerformanceStatus.CANCELED
+            )
+        stmt = select(inner.exists()) # 축제에 CANCELED가 아닌 공연이 있는지 EXISTS로 확인하는 메서드
+        result = await self._session.execute(stmt)
+        return result.scalar()
