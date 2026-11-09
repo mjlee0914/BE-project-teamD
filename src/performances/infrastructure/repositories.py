@@ -1,4 +1,6 @@
-from sqlalchemy import func, select
+from datetime import datetime
+
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
@@ -165,11 +167,27 @@ class SqlAlchemyPerformanceRepository(PerformanceRepository):
         result = await self._session.execute(stmt)
         return result.scalar()
 
+    # festival취소 시, 취소되지 않은 공연이 있는지 확인
     async def exists_uncanceled_by_festival(self, festival_id: int) -> bool:
         inner = select(PerformanceModel.id).where(
             PerformanceModel.festival_id == festival_id,
-            PerformanceModel.status != PerformanceStatus.CANCELED
-            )
-        stmt = select(inner.exists()) # 축제에 CANCELED가 아닌 공연이 있는지 EXISTS로 확인하는 메서드
+            PerformanceModel.status != PerformanceStatus.CANCELED,
+        )
+        stmt = select(inner.exists())  # 축제에 CANCELED가 아닌 공연이 있는지 EXISTS로 확인하는 메서드
+        result = await self._session.execute(stmt)
+        return result.scalar()
+
+    # festival 기간 변경 시, 바뀐 기간 밖에 취소되지 않은 공연이 있는지 확인
+    async def exists_outside_period(self, festival_id: int, period_start: datetime, period_end: datetime) -> bool:
+        inner = select(PerformanceModel.id).where(
+            # 같은 축제이고
+            PerformanceModel.festival_id == festival_id,
+            # 취소상태가 아니고
+            PerformanceModel.status != PerformanceStatus.CANCELED,
+            # 하나만 해당해도 기간 밖 (공연 시작보다 너무 일찍 혹은 공연 종료보다 너무 늦게)
+            # or_(A or B)
+            or_(PerformanceModel.starts_at < period_start, PerformanceModel.ends_at >= period_end),
+        )
+        stmt = select(inner.exists())  # 기간 밖에 있는, 취소되지 않은 공연이 하나라도 있는지 EXISTS로 확인
         result = await self._session.execute(stmt)
         return result.scalar()
