@@ -27,9 +27,10 @@
 """
 
 from dataclasses import dataclass, field  # 엔티티 반복 코드 줄여주는 도구
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from uuid import UUID, uuid4
 
+from shared.core.time import KST  # 공연당일 판단기준 시간대(한국시간)
 from tickets.domain.enums import TicketStatus
 from tickets.domain.exceptions import (
     InvalidTicketPerformanceTime,
@@ -38,9 +39,6 @@ from tickets.domain.exceptions import (
     TicketNotCancelable,
     TicketNotEnterable,
 )
-
-# 공연당일 판단기준 시간대(한국시간)
-KST = timezone(timedelta(hours=9))
 
 # 끝난 상태: 더 이상 상태를 바꿀 수 없다
 FINAL_STATUSES = (
