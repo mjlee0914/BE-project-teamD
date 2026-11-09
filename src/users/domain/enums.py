@@ -10,5 +10,4 @@ class UserRole(StrEnum):
 # 회원 상태 (탈퇴 여부는 WITHDRAWN으로 판단)
 class UserStatus(StrEnum):
     ACTIVE = "ACTIVE"  # 정상
-    SUSPENDED = "SUSPENDED"  # 정지
-    WITHDRAWN = "WITHDRAWN"  # 탈퇴
+    WITHDRAWN = "WITHDRAWN"  # 탈퇴 (소프트 삭제)
