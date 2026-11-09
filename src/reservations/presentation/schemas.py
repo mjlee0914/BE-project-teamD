@@ -19,7 +19,8 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 # 프로젝트 코드
-from reservations.domain.enums import DiscountType, TicketType
+from reservations.domain.enums import DiscountType
+from shared.core.enums import TicketType
 
 
 # 예매 생성 요청 body (POST /v1/reservations)

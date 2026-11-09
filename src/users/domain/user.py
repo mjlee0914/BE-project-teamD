@@ -57,8 +57,8 @@ import re
 # __init__, __repr__, __eq__를 자동으로 만들어 주는 데코레이터
 from dataclasses import dataclass
 
-# 탈퇴 시각 기록용 (UTC 기준)
-from datetime import UTC, datetime
+# 탈퇴 시각 기록용 (UTC 기준, 서비스가 now_utc()로 넘겨줌)
+from datetime import datetime
 
 # enums.py
 from users.domain.enums import UserRole, UserStatus
@@ -207,7 +207,7 @@ class User:
     # [회원 탈퇴(소프트 삭제) 비즈니스 로직]
     # requester: 탈퇴를 '요청한 사람' (self = 탈퇴 '대상')
     # 소프트 삭제 : 실제 DELETE 대신 상태값만 바꿈 → 예매 내역 등 연관 데이터 보존
-    def withdraw(self, requester: "User") -> None:
+    def withdraw(self, requester: "User", now: datetime) -> None:
         # [1] 중복 탈퇴 방지 → 409 (규칙 16)
         if self.status == UserStatus.WITHDRAWN:
             raise InvalidUserStatus(
@@ -224,7 +224,7 @@ class User:
         # 행을 지우지 않고 상태, 시간만 기록 (규칙 17)
         self.status = UserStatus.WITHDRAWN
         # [6] 탈퇴 시각 기록: 서버 지역과 무관하게 UTC로 통일
-        self.deleted_at = datetime.now(UTC)
+        self.deleted_at = now
 
     # [회원 정보 수정 비즈니스 로직]
     # email, role은 매개변수 자체가 없음 -> 수정 방법 없음 (규칙 18)

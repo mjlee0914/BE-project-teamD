@@ -1,5 +1,6 @@
-from reservations.domain.enums import ReservationStatus, TicketType
+from reservations.domain.enums import ReservationStatus
 from reservations.domain.exceptions import OverReservationQuantity
+from shared.core.enums import TicketType
 
 MAX_PER_DAY = 2
 

@@ -3,7 +3,7 @@
 # 저장소를 생성자로 받고, 없으면 NotFound raise
 # 요청이 끝날 때 get_db가 commit한다.
 
-from datetime import UTC, date, datetime  # UTC, datetime -> cancel에서 사용
+from datetime import date
 
 from festivals.domain.exceptions import (
     FestivalHasPerformanceOutsidePeriod,
@@ -13,10 +13,8 @@ from festivals.domain.exceptions import (
 from festivals.domain.festival import Festival
 from festivals.domain.repository import FestivalRepository
 from performances.domain.enums import PerformanceStatus
-
-# TODO: KST 상수 통일 회의 후 shared로 교체 (#110 리뷰)
-from performances.domain.performance import KST
 from performances.domain.repository import PerformanceRepository
+from shared.core.time import KST, now_utc
 
 
 class FestivalService:
@@ -127,6 +125,6 @@ class FestivalService:
         festival = await self.get_festival(festival_id)
 
         # 지금 시각을 만들어서 엔티티에 넘긴다.
-        festival.cancel(datetime.now(UTC))
+        festival.cancel(now_utc())
         # TODO: 축제취소 시 소속 공연 처리(팀 결정 필요)
         return await self._festival_repo.save(festival)
