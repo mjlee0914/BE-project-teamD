@@ -9,7 +9,7 @@ from payments.application.webhook_service import DepositWebhookService
 from payments.domain.enums import PaymentStatus
 from payments.domain.exceptions import PaymentProcessingError
 
-router = APIRouter(prefix="/v1/payments/webhooks", tags=["payment-webhooks"])
+router = APIRouter(prefix="/v1", tags=["payment-webhooks"])
 
 
 # 토스의 camelCase 필드를 내부 snake_case로 받는다. 추가 필드는 무시하고 secret은 repr 출력에서 감춘다.
@@ -33,7 +33,7 @@ def provide_deposit_webhook_service() -> DepositWebhookService:
 
 
 # 입금 알림을 서비스에 전달한다. 재조회가 실패하면 재전송할 수 있게 503, 처리가 끝나면 빈 204를 반환한다.
-@router.post("/deposit", status_code=204)
+@router.post("/payments/webhooks/deposit", status_code=204)
 async def deposit_callback(
     request: DepositCallbackRequest,
     service: Annotated[DepositWebhookService, Depends(provide_deposit_webhook_service)],
