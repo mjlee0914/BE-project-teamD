@@ -1,6 +1,6 @@
 # 순서: 꺼내기 → 처리 → 저장 
 # 요청이 끝날 때 get_db가 commit
-from datetime import UTC, datetime
+from datetime import datetime
 
 from festivals.domain.exceptions import FestivalNotFound
 from festivals.domain.repository import FestivalRepository
@@ -10,6 +10,7 @@ from performances.domain.exceptions import (
 )
 from performances.domain.performance import Performance
 from performances.domain.repository import PerformanceRepository
+from shared.core.time import now_utc
 
 
 class PerformanceService:
@@ -123,14 +124,14 @@ class PerformanceService:
         # TODO: 예매 일괄 취소 (회의 11/9)
         return await self._performance_repo.save(performance)
 
-    # 완료 (꺼내기 -> 엔티티 메서드 -> 저장). performance.complete(now(UTC))
+    # 완료 (꺼내기 -> 엔티티 메서드 -> 저장). performance.complete(now_utc())
     async def complete_performance(self, performance_id: int) -> Performance:
         performance = await self.get_performance(performance_id)
-        performance.complete(datetime.now(UTC))
+        performance.complete(now_utc())
         return await self._performance_repo.save(performance)
 
     # bookable 조회
     async def get_availability(self, performance_id: int) -> tuple[Performance, bool]:
         performance = await self.get_performance(performance_id)
-        result = performance.is_bookable(datetime.now(UTC))
+        result = performance.is_bookable(now_utc())
         return performance, result
