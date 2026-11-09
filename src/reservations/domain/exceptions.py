@@ -45,6 +45,15 @@ class DepositDeadlineViolation(ConflictException):
         super().__init__(message=message, error_code="DEPOSIT_DEADLINE_VIOLATION")
 
 
+# 지금은 예매할 수 없는 상태 : 축제가 취소·종료됨, 회차가 오픈 전·매진·예매 기간 밖 (409)
 class ReservationNotAvailable(ConflictException):
     def __init__(self, message: str = "현재 예매할 수 없습니다."):
         super().__init__(message=message, error_code="RESERVATION_NOT_AVAILABLE")
+
+
+# 취소 마감 위반 : 입금 완료(CONFIRMED) 예매를 회차의 취소 마감(cancel_deadline_at) 이후에 취소하려 함 (409)
+# - 입금 전(PENDING) 예매는 마감과 상관없이 취소 가능하므로 이 예외가 나지 않음
+# - ConflictException(409)을 상속 : 요청 형식은 맞지만 "지금 상태"와 충돌하기 때문
+class CancelDeadlineViolation(ConflictException):
+    def __init__(self, message: str = "예매 취소 기간을 벗어났습니다."):
+        super().__init__(message=message, error_code="CANCEL_DEADLINE_VIOLATION")

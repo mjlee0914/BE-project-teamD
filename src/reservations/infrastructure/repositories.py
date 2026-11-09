@@ -1,5 +1,5 @@
 """
-# infrastructure/repository.py
+# infrastructure/repositories.py
 domain/repository.py에서 정의한 추상 클래스를 실제 DB로 구현하는 파일
     - SQLAlchemy 세션으로 DB에 저장 / 조회
     - DB의 ORM 모델 <-> domain 엔티티를 서로 변환

@@ -1,5 +1,8 @@
 from datetime import date, datetime
-from pydantic import BaseModel, Field, model_validator, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from festivals.domain.enums import FestivalStatus
 
 
 class FestivalCreate(BaseModel):
@@ -55,5 +58,6 @@ class FestivalResponse(BaseModel):
     created_at: datetime
     updated_at: datetime | None
     canceled_at: datetime | None
+    status: FestivalStatus # 축제 응답에 계산된 status가 나오도록 추가함.
 
     model_config = ConfigDict(from_attributes=True)

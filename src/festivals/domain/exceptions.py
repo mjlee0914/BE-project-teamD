@@ -1,4 +1,9 @@
-from shared.core.exceptions import NotFoundException, UnprocessableException, ConflictException
+from shared.core.exceptions import (
+    ConflictException,
+    NotFoundException,
+    UnprocessableException,
+)
+
 
 # 조회했는데 없음 (service에서 던짐)
 class FestivalNotFound(NotFoundException):
@@ -23,3 +28,16 @@ class FestivalAlreadyCanceled(ConflictException):
 class FestivalPeriodOverlap(ConflictException):
     def __init__(self, message: str = "같은 장소에 기간이 겹치는 축제가 있습니다."):
         super().__init__(message=message, error_code="FESTIVAL_PERIOD_OVERLAP")
+
+class FestivalHasPerformanceOutsidePeriod(ConflictException):
+    def __init__(self, message: str = "변경할 기간 밖에 있는 공연이 있어 축제 기간을 변경할 수 없습니다."):
+        super().__init__(message=message, error_code="FESTIVAL_HAS_PERFORMANCES_OUTSIDE_PERIOD")
+
+class InvalidFestivalName(UnprocessableException):
+    def __init__(self, message: str = "유효하지 않은 축제 이름입니다."):
+        super().__init__(message=message, error_code="INVALID_FESTIVAL_NAME")
+
+class InvalidFestivalVenue(UnprocessableException):
+    def __init__(self, message: str = "유효하지 않은 축제 장소입니다."):
+        super().__init__(message=message, error_code="INVALID_FESTIVAL_VENUE")
+
