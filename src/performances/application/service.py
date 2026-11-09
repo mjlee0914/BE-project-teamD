@@ -47,7 +47,7 @@ class PerformanceService:
         if festival is None:
             raise FestivalNotFound()
 
-        # TODO: 취소된 축제 막기
+        festival.ensure_not_canceled()
         
         if await self._performance_repo.exists_duplicated_title(
             festival_id=festival_id,
