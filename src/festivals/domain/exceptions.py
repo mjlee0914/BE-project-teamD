@@ -29,9 +29,16 @@ class FestivalPeriodOverlap(ConflictException):
     def __init__(self, message: str = "같은 장소에 기간이 겹치는 축제가 있습니다."):
         super().__init__(message=message, error_code="FESTIVAL_PERIOD_OVERLAP")
 
+# 축제기간을 벗어난 공연으로 인해 기간 변경 불가
 class FestivalHasPerformanceOutsidePeriod(ConflictException):
     def __init__(self, message: str = "변경할 기간 밖에 있는 공연이 있어 축제 기간을 변경할 수 없습니다."):
         super().__init__(message=message, error_code="FESTIVAL_HAS_PERFORMANCES_OUTSIDE_PERIOD")
+
+# 축제가 취소되지 않은 공연이 있어 축제취소를 못함 (#112)
+# 이미 끝난(COMPLETED) 공연도 포함 -> 공연을 먼저 취소해야 축제를 취소할 수 있음
+class FestivalHasUncanceledPerformances(ConflictException):
+    def __init__(self, message: str = "취소되지 않은 공연이 있어 축제를 취소할 수 없습니다. 공연을 먼저 취소해 주세요."):
+        super().__init__(message=message, error_code="FESTIVAL_HAS_UNCANCELED_PERFORMANCES")
 
 class InvalidFestivalName(UnprocessableException):
     def __init__(self, message: str = "유효하지 않은 축제 이름입니다."):
