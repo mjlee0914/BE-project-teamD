@@ -72,28 +72,27 @@ class Festival:
 
     # 축제이름, 축제장소 검증용
     @staticmethod
-    def _normalize_text(val:str, error: type[Exception]) -> str:
+    def _normalize_text(val: str, error: type[Exception]) -> str:
         val = val.strip()
         if not (1 <= len(val) <= 50):
             raise error()
-        return val 
+        return val
 
     # 축제 설명 정리용
     @staticmethod
-    def _normalize_description(des: str | None) -> str | None:
-        if not des:
+    def _normalize_description(description: str | None) -> str | None:
+        if not description:
             return None
-        des = des.strip()
-        if not des:
+        description = description.strip()
+        if not description:
             return None
-        else:
-            return des
+        return description
 
     # 규칙 5/6번: 상태 계산 -> 상태를 저장하지 않고 status(today)로 계산
     # 오늘 날짜를 인자로 받음
     # 안에서 date.today()를 부르면 테스트할 때 날짜를 바꿀 수 없음
     # canceled_at 확인을 제일 먼저 함 (규칙 6)
-    def status(self, today:date) -> FestivalStatus:
+    def status(self, today: date) -> FestivalStatus:
         if self.canceled_at is not None:
             return FestivalStatus.CANCELED
         if self.starts_on > today:
@@ -137,7 +136,7 @@ class Festival:
     ) -> None:
         if self.canceled_at is not None:
             raise FestivalAlreadyCanceled("취소된 축제의 정보는 바꿀 수 없습니다.")
-        
+
         new_name = name if name is not None else self.name
         new_venue = venue if venue is not None else self.venue
 
@@ -151,4 +150,4 @@ class Festival:
         self.name = new_name
         self.venue = new_venue
         self.description = new_description
-        
+

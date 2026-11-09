@@ -35,7 +35,7 @@ class FestivalService:
 
     # 페스티벌 생성하기
     async def create_festival(
-            self, 
+            self,
             name: str,
             venue: str,
             starts_on: date,
@@ -44,7 +44,7 @@ class FestivalService:
             ) -> Festival:
 
         # Domain entity(Festival) 검사
-        festival = Festival( 
+        festival = Festival(
             name=name,
             venue=venue,
             starts_on=starts_on,
@@ -53,7 +53,7 @@ class FestivalService:
         )
 
         # 같은 장소, 기간 겹치는지 검사
-        if await self._festival_repo.exists_overlapping(  
+        if await self._festival_repo.exists_overlapping(
             festival.venue,
             festival.starts_on,
             festival.ends_on
@@ -68,7 +68,7 @@ class FestivalService:
         # 1페이지: 1~10번째 : 앞에서 0개 건너뛰고 10개
         # 2페이지: 11~20번째: 앞에서 10개 건너뛰고 10개
         # 3페이지: 21~25번째: 앞에서 20개 건너뛰고 10개 (5개만 있을 시 5개)
-        offset = (page - 1) * size 
+        offset = (page - 1) * size
 
         festivals = await self._festival_repo.find_all(offset=offset, limit=size) # 계층마다 부르는 이름이 다르다.
         total = await self._festival_repo.count() # 전체 개수 계산 -> ex) 전체 total개 중 1 페이지
@@ -92,14 +92,14 @@ class FestivalService:
         festival.change_period(starts_on=starts_on, ends_on=ends_on)
 
         # 겹침 검사
-        if await self._festival_repo.exists_overlapping(  
+        if await self._festival_repo.exists_overlapping(
             festival.venue,
             festival.starts_on,
             festival.ends_on,
             exclude_id=festival_id
         ):
             raise FestivalPeriodOverlap()
-        
+
         # 줄어든 기간 밖에 공연이 있는지 검사
         # count로 공연 개수 세기
         count = await self._performance_repo.count_by_festival(festival_id)
@@ -115,7 +115,7 @@ class FestivalService:
 
         # 저장
         return await self._festival_repo.save(festival)
-    
+
     # 취소: 꺼내기 -> 취소 -> 저장
     async def cancel_festival(
             self,

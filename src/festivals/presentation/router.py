@@ -70,7 +70,7 @@ async def list_festivals(
     page: Annotated[int, Query(ge=1)] = 1,
     size: Annotated[int, Query(ge=1, le=100)] = 10,
 ):
-    
+
     festivals, total = await service.list_festivals(page, size)
 
     # 리스트를 통째로 model_validate에 넣지 않고, for문으로 하나씩 꺼낸다.
@@ -79,7 +79,7 @@ async def list_festivals(
     items = [_to_response(f) for f in festivals]
     # PageResponse.create로 4개 값을 하나로 묶어 페이지 응답 하나를 만든다.
     page_data = PageResponse.create(items=items, total=total, page=page, size=size)
-    
+
     return APIResponse.ok(data=page_data)
 
 
@@ -101,7 +101,7 @@ async def update_festival(
 ):
     festival = await service.update_festival(
         festival_id=festival_id,
-        name= body.name,
+        name=body.name,
         venue=body.venue,
         description=body.description,
         starts_on=body.starts_on,
