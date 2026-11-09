@@ -82,7 +82,7 @@ Performance 규칙
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 
 from performances.domain.enums import PerformanceStatus
 from performances.domain.exceptions import (
@@ -92,9 +92,10 @@ from performances.domain.exceptions import (
     InvalidPerformanceTime,
     InvalidPerformanceTitle,
 )
+from shared.core.time import (
+    KST,  # 규칙 6에서 공연 시각을 KST 기준 날짜로 변환하여 비교할 때 사용
+)
 
-# 규칙 6에서 공연 시각을 KST 기준 날짜로 변환하여 비교할 때 사용
-KST = timezone(timedelta(hours=9))
 CANCEL_DEADLINE_BEFORE_START = timedelta(hours=24)
 
 @dataclass

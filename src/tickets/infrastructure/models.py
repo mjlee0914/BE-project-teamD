@@ -83,3 +83,8 @@ class Ticket(Base):
 
     # 티켓가격
     price: Mapped[int] = mapped_column(Integer)
+
+    # 낙관적 락 번호표: UPDATE 때 WHERE version=? 비교 후 +1 (SQLAlchemy가 자동 처리)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
+    __mapper_args__ = {"version_id_col": version}  # noqa: RUF012

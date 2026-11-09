@@ -20,7 +20,7 @@
 
 [상태 변경]
 7. 예매가 확정되면 PENDING → ISSUED, issued_at을 기록한다.
-8. 취소하면 ISSUED → CANCELED, canceled_at을 기록한다. (PENDING 취소 허용 여부는 팀 확인 필요)
+8. 취소하면 PENDING/ISSUED → CANCELED, canceled_at을 기록한다. 취소 마감 시각이 지나면 취소할 수 없다.
 9. 입장하면 ISSUED → USED, used_at을 기록한다.
 10. 공연 종료 후 미사용이면 ISSUED → EXPIRED.
 11. CANCELED, USED, EXPIRED는 끝난 상태라 다른 상태로 바꿀 수 없다.
@@ -30,8 +30,30 @@ from dataclasses import dataclass, field  # 엔티티 반복 코드 줄여주는
 from datetime import datetime
 from uuid import UUID, uuid4
 
+from shared.core.time import KST  # 공연당일 판단기준 시간대(한국시간)
 from tickets.domain.enums import TicketStatus
-from tickets.domain.exceptions import InvalidTicketPerformanceTime, InvalidTicketPrice
+from tickets.domain.exceptions import (
+    InvalidTicketPerformanceTime,
+    InvalidTicketPrice,
+    InvalidTicketStatus,
+    TicketNotCancelable,
+    TicketNotEnterable,
+)
+
+# 끝난 상태: 더 이상 상태를 바꿀 수 없다
+FINAL_STATUSES = (
+    TicketStatus.CANCELED,
+    TicketStatus.USED,
+    TicketStatus.EXPIRED,
+)
+
+
+# now는 DB 시각(DateTime(timezone=True))과 비교하므로 시간대가 있어야 한다
+def _require_aware(now: datetime) -> None:
+    if now.tzinfo is None:
+        raise ValueError(
+            "now는 시간대가 있는 값이어야 합니다. datetime.now(UTC)를 사용하세요."
+        )
 
 
 # 티켓양식
@@ -59,6 +81,8 @@ class Ticket:
     created_at: datetime | None = None
     updated_at: datetime | None = None
     ticket_code: UUID = field(default_factory=uuid4)
+    # 낙관적 락 번호표. 저장 전에는 None, 저장소가 채운다
+    version: int | None = None
 
     # 잘못된 티켓이 발행되지 않게 검증
     # self의 price, 공연 시각을 읽어야 해서 staticmethod가 아닌 인스턴스 메서드로 작성
@@ -69,3 +93,45 @@ class Ticket:
             raise InvalidTicketPerformanceTime(
                 "공연 종료 시각은 시작 시각보다 뒤여야 합니다"
             )
+
+    # 결제 확인 후 티켓 발급 pending -> issued
+    def confirm(self, now: datetime) -> None:  # 값을 돌려주지 않고 자기 자신을 바꿈
+        _require_aware(now)
+        if self.status != TicketStatus.PENDING:
+            raise InvalidTicketStatus("결제 대기 상태의 티켓만 발급할 수 있습니다.")
+        self.status = TicketStatus.ISSUED  # 객체 안 값이 직접 수정됨.
+        self.issued_at = now
+
+    # 취소 pending/issued -> canceled
+    def cancel(self, now: datetime) -> None:
+        _require_aware(now)
+        if self.status in FINAL_STATUSES:
+            raise TicketNotCancelable("이미 처리가 끝난 티켓은 취소할 수 없습니다.")
+        if now > self.cancel_deadline_at:
+            raise TicketNotCancelable("취소 가능한 기간이 지났습니다.")
+        self.status = TicketStatus.CANCELED
+        self.canceled_at = now
+
+    # 입장 issued -> used
+    def enter(self, now: datetime) -> None:
+        _require_aware(now)
+        if self.status != TicketStatus.ISSUED:
+            raise TicketNotEnterable("발급된 티켓만 입장할 수 있습니다.")
+        if (
+            now.astimezone(KST).date()
+            != self.performance_start_at.astimezone(KST).date()
+        ):
+            raise TicketNotEnterable("공연 당일에만 입장할 수 있습니다.")
+        if now >= self.performance_end_at:
+            raise TicketNotEnterable("이미 종료된 공연입니다")
+        self.status = TicketStatus.USED
+        self.used_at = now
+
+    # 만료 issued -> expired
+    def expire(self, now: datetime) -> None:
+        _require_aware(now)
+        if self.status != TicketStatus.ISSUED:
+            raise InvalidTicketStatus("발급된 티켓만 만료 처리할 수 있습니다.")
+        if now < self.performance_end_at:
+            raise InvalidTicketStatus("공연이 끝난 뒤에 만료 처리할 수 있습니다.")
+        self.status = TicketStatus.EXPIRED
