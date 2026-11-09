@@ -31,31 +31,43 @@ class TicketRepository(ABC):
     async def count_by_reservation_id(self, reservation_id: int) -> int:
         """예매에 이미 발급된 티켓 수를 반환한다. 취소된 티켓도 포함해서 센다."""
 
-    # ----목록/집계
+    # ----목록/집계--------
 
-    # 내 티켓 목록/ 전체 개수 반환
+    # 내 티켓 목록 (최신순). 전체 개수는 count_by_user가 따로 센다
     @abstractmethod
-    async def get_all_by_user(
+    async def find_all_by_user(
         self,
         user_id: int,
         status: TicketStatus | None,
-        page: int,
-        size: int,
-    ) -> tuple[list[Ticket], int]:
-        """사용자 검색 결과와 전체개수를 반환한다. page는 1부터, 최신 발급순"""
+        offset: int,
+        limit: int,
+    ) -> list[Ticket]:
+        """사용자의 티켓 목록. 최신순(created_at, id 내림차순). status가 None이면 전체."""
 
-    # 관리자 검색결과 전체 개수 반환
+    # 내 티켓 전체 개수 (PageResponse.total 용)
     @abstractmethod
-    async def search(
+    async def count_by_user(self, user_id: int, status: TicketStatus | None) -> int:
+        """사용자의 티켓 개수. status가 None이면 전체."""
+
+    # 관리자 검색
+    @abstractmethod
+    async def find_all(
         self,
         performance_id: int | None,
         status: TicketStatus | None,
-        page: int,
-        size: int,
-    ) -> tuple[list[Ticket], int]:
-        """관리자 검색 결과와 전체 개수를 반환한다. page는 1부터, 최신 발급순."""
+        offset: int,
+        limit: int,
+    ) -> list[Ticket]:
+        """관리자 검색 목록. 최신순. 조건이 None이면 그 조건은 걸지 않는다."""
+
+    # 관리자 검색 전체 개수 (PageResponse.total 용)
+    @abstractmethod
+    async def count(
+        self, performance_id: int | None, status: TicketStatus | None
+    ) -> int:
+        """관리자 검색 조건에 맞는 티켓 개수."""
 
     # 입장 현황
     @abstractmethod
     async def count_by_status(self, performance_id: int) -> dict[TicketStatus, int]:
-        """회차별 상태별 티켓 수. (입장 현황)"""
+        """회차별 상태별 티켓 수. 없는 상태는 0으로 채워 모든 상태를 돌려준다."""
