@@ -13,7 +13,7 @@ from performances.presentation.schemas import (
 from shared.core.schemas import APIResponse, PageResponse
 
 router = APIRouter(
-    prefix="/v1/performances",
+    prefix="/v1",
     tags=["performances"],
 )
 
@@ -26,8 +26,8 @@ PerformanceServiceDep = Annotated[PerformanceService, Depends(get_performance_se
 
 # 공연 회차 등록
 # TODO(auth): 관리자 전용 - require_admin 붙이기
-# POST ??? (축제 id를 받는 경로 미정: Slack 결정 확인)
-@router.post("", status_code=201, response_model=APIResponse[PerformanceResponse])
+# POST /v1/festivals/{festival_id}/performances
+@router.post("/festivals/{festival_id}/performances", status_code=201, response_model=APIResponse[PerformanceResponse])
 async def create_performance(
     festival_id: int,
     body: PerformanceCreate,
@@ -47,8 +47,8 @@ async def create_performance(
     return APIResponse.ok(data=PerformanceResponse.model_validate(performance))
 
 # 공연 회차 목록 조회 (축제별)
-# GET ??? (축제 id를 받는 경로 미정: Slack 결정 확인)
-@router.get("", response_model=APIResponse[PageResponse[PerformanceResponse]])
+# GET /v1/festivals/{festival_id}/performances
+@router.get("/festivals/{festival_id}/performances", response_model=APIResponse[PageResponse[PerformanceResponse]])
 async def list_performances(
     festival_id: int,
     service: PerformanceServiceDep,
@@ -63,7 +63,7 @@ async def list_performances(
 
 # 공연 회차 상세 조회
 # GET /v1/performances/{performance_id}
-@router.get("/{performance_id}", response_model=APIResponse[PerformanceResponse])
+@router.get("/performances/{performance_id}", response_model=APIResponse[PerformanceResponse])
 async def get_performance(performance_id: int, service: PerformanceServiceDep):
     performance = await service.get_performance(performance_id)
     return APIResponse.ok(data=PerformanceResponse.model_validate(performance))
@@ -71,7 +71,7 @@ async def get_performance(performance_id: int, service: PerformanceServiceDep):
 # 공연 회차 정보 수정
 # TODO(auth): 관리자 전용 - require_admin 붙이기
 # PATCH /v1/performances/{performance_id}
-@router.patch("/{performance_id}", response_model=APIResponse[PerformanceResponse])
+@router.patch("/performances/{performance_id}", response_model=APIResponse[PerformanceResponse])
 async def update_performance(
     performance_id: int,
     body: PerformanceUpdate,
@@ -87,14 +87,14 @@ async def update_performance(
     )
     return APIResponse.ok(data=PerformanceResponse.model_validate(performance))
 
-    
+
 # 상태 변경(오픈/취소/종료)은 API로 직접 전환 → DB의 status 컬럼에 저장
 # (Festival은 반대로 별도 API 없이 날짜로 status를 자동 계산)
 # 상태 변경 API는 PATCH로 통일 (팀 회의 11/9)
 # 공연 예매 오픈
 # TODO(auth): 관리자 전용 - require_admin 붙이기
 # PATCH /v1/performances/{performance_id}/open
-@router.patch("/{performance_id}/open", response_model=APIResponse[PerformanceResponse])
+@router.patch("/performances/{performance_id}/open", response_model=APIResponse[PerformanceResponse])
 async def open_performance(
     performance_id: int,
     service: PerformanceServiceDep
@@ -105,7 +105,7 @@ async def open_performance(
 # 공연 취소
 # TODO(auth): 관리자 전용 - require_admin 붙이기
 # PATCH /v1/performances/{performance_id}/cancel
-@router.patch("/{performance_id}/cancel", response_model=APIResponse[PerformanceResponse])
+@router.patch("/performances/{performance_id}/cancel", response_model=APIResponse[PerformanceResponse])
 async def cancel_performance(
     performance_id: int,
     service: PerformanceServiceDep
@@ -116,7 +116,7 @@ async def cancel_performance(
 # 공연 종료
 # TODO(auth): 관리자 전용 - require_admin 붙이기
 # PATCH /v1/performances/{performance_id}/complete
-@router.patch("/{performance_id}/complete", response_model=APIResponse[PerformanceResponse])
+@router.patch("/performances/{performance_id}/complete", response_model=APIResponse[PerformanceResponse])
 async def complete_performance(
     performance_id: int,
     service: PerformanceServiceDep
@@ -126,7 +126,7 @@ async def complete_performance(
 
 # 예매 가능 여부 조회
 # GET /v1/performances/{performance_id}/availability
-@router.get("/{performance_id}/availability", response_model=APIResponse[AvailabilityResponse])
+@router.get("/performances/{performance_id}/availability", response_model=APIResponse[AvailabilityResponse])
 async def get_availability(
     performance_id: int,
     service: PerformanceServiceDep

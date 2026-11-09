@@ -155,14 +155,14 @@ class Performance:
 
     @staticmethod
     def _validate_schedule(
-        starts_at: datetime, 
-        ends_at: datetime, 
-        booking_open_at: datetime, 
+        starts_at: datetime,
+        ends_at: datetime,
+        booking_open_at: datetime,
         booking_close_at: datetime,
         cancel_deadline_at: datetime
         ) -> None:
         # 규칙 3
-        if starts_at >= ends_at:  
+        if starts_at >= ends_at:
             raise InvalidPerformanceTime("공연 시작 시간은 종료 시간보다 빨라야 합니다.")
         # 규칙 4
         if not (booking_open_at < booking_close_at <= starts_at):
@@ -174,7 +174,7 @@ class Performance:
     # 규칙 6
     @staticmethod
     def _validate_within_festival(
-            festival_starts_on:date, 
+            festival_starts_on:date,
             festival_ends_on: date,
             starts_at: datetime,
             ends_at: datetime,
@@ -198,13 +198,13 @@ class Performance:
         festival_id: int,
         title: str,
         starts_at: datetime,
-        ends_at: datetime, 
+        ends_at: datetime,
         booking_open_at: datetime,
         booking_close_at: datetime,
         capacity: int,
         price: int,
         festival_starts_on: date,
-        festival_ends_on: date,                
+        festival_ends_on: date,
         ) -> "Performance": # 줄을 읽는 시점에 Performance객체가 아직 다 안만들어짐 -> 따옴표로 감싸서 글자 그대로 우선 저장.
         performance = cls(
             festival_id=festival_id,
@@ -215,16 +215,16 @@ class Performance:
             booking_close_at=booking_close_at,
             capacity=capacity,
             price=price,
-        )      
+        )
         performance._validate_within_festival(festival_starts_on=festival_starts_on, festival_ends_on=festival_ends_on, starts_at=starts_at, ends_at=ends_at)
-        
+
         return performance
-    
+
     # 규칙 13 : SCHEDULED → OPEN
     def open(self) -> None:
         if self.status == PerformanceStatus.SCHEDULED:
             self.status = PerformanceStatus.OPEN
-        else: 
+        else:
             raise InvalidPerformanceStatus("예매 시작 전 공연만 오픈할 수 있습니다.")
 
     # 규칙 13 : OPEN, SOLD_OUT → COMPLETED
@@ -238,10 +238,10 @@ class Performance:
         self.status = PerformanceStatus.COMPLETED
 
     # 규칙 14/15 : 공연 취소 시 상태값 CANCELED로 변경
-    def cancel(self) -> None:
+    def cancel(self, now: datetime) -> None:
         if self.status == PerformanceStatus.CANCELED:
             raise InvalidPerformanceStatus("이미 취소된 공연입니다.")
-        if self.status == PerformanceStatus.COMPLETED:
+        if self.status == PerformanceStatus.COMPLETED or now >= self.ends_at:
             raise InvalidPerformanceStatus("이미 종료된 공연입니다.")
 
         self.status = PerformanceStatus.CANCELED
@@ -258,7 +258,7 @@ class Performance:
         # CANCELED, COMPLETED 공연은 일정 수정 불가 (규칙 17)
         if self.status in (PerformanceStatus.CANCELED, PerformanceStatus.COMPLETED):
             raise InvalidPerformanceStatus("취소되었거나 종료된 공연은 스케줄을 변경할 수 없습니다.")
-        
+
         # PATCH => change_schedule()에 인자로 넣는 값만 바꾸기
         # 바꾸지 않는 값은 원래 있던 값(self.)으로 넣기
         new_starts = starts_at if starts_at is not None else self.starts_at
@@ -281,11 +281,11 @@ class Performance:
     def change_capacity(self, new_capacity: int)-> None:
         if self.status in (PerformanceStatus.CANCELED, PerformanceStatus.COMPLETED):
             raise InvalidPerformanceStatus("취소되었거나 이미 끝난 공연은 수용 인원을 바꿀 수 없습니다.")
-        
+
         # 좌석 0개짜리 공연 생성 막기
         if new_capacity < 1:
             raise InvalidPerformanceCapacity("수용 인원은 1명 이상이어야 합니다.")
-        
+
         # 이미 팔린 수량 정의
         sold = self.capacity - self.remaining_count
 
@@ -337,10 +337,10 @@ class Performance:
     # 규칙 19: 예매 취소 시 잔여 수량 복구 (reservations 서비스에서 예매 취소 시 호출)
     def increase_remaining(self, quantity: int) -> None:
         # 1. 상태 검사: OPEN, SOLD_OUT에 해당하지 않으면 InvalidPerformanceStatus (409)
-        #    (CANCELED/COMPLETED 공연은 재고를 되돌릴 의미가 없음)        
+        #    (CANCELED/COMPLETED 공연은 재고를 되돌릴 의미가 없음)
         if self.status not in (PerformanceStatus.OPEN, PerformanceStatus.SOLD_OUT):
             raise InvalidPerformanceStatus("취소되었거나 종료된 공연은 잔여 수량을 복구할 수 없습니다.")
-        
+
         # 2. 0장 이하는 취소 안됨 or 잔여수량 + 취소수량이 capacity보다 클 수 없음
         if quantity <= 0 or self.remaining_count + quantity > self.capacity:
             raise InvalidPerformanceCapacity("복구 수량이 수용 인원 범위를 벗어났습니다.")
@@ -351,8 +351,8 @@ class Performance:
         #    ex) 잔여 0(SOLD_OUT), 2장 취소 → 잔여 2, OPEN으로 변경
         if self.status == PerformanceStatus.SOLD_OUT:
             self.status = PerformanceStatus.OPEN
-        
 
 
-        
+
+
 

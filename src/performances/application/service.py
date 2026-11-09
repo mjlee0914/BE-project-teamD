@@ -1,4 +1,4 @@
-# 순서: 꺼내기 → 처리 → 저장 
+# 순서: 꺼내기 → 처리 → 저장
 # 요청이 끝날 때 get_db가 commit
 from datetime import datetime
 
@@ -28,15 +28,15 @@ class PerformanceService:
         performance = await self._performance_repo.find_by_id(performance_id)
         if performance is None:
             raise PerformanceNotFound()
-        return performance 
+        return performance
 
     # 생성
     async def create_performance(
-            self, 
+            self,
             festival_id: int,
             title: str,
             starts_at: datetime,
-            ends_at: datetime, 
+            ends_at: datetime,
             booking_open_at: datetime,
             booking_close_at: datetime,
             capacity: int,
@@ -49,7 +49,7 @@ class PerformanceService:
             raise FestivalNotFound()
 
         festival.ensure_not_canceled()
-        
+
         if await self._performance_repo.exists_duplicated_title(
             festival_id=festival_id,
             title=title,
@@ -73,6 +73,10 @@ class PerformanceService:
 
     # 목록 조회
     async def list_performances(self, festival_id: int, page: int, size: int) -> tuple[list[Performance], int]:
+        festival = await self._festival_repo.find_by_id(festival_id)
+        if festival is None:
+            raise FestivalNotFound()
+
         offset = (page - 1) * size
 
         performances = await self._performance_repo.find_all_by_festival(festival_id=festival_id, offset=offset, limit=size)
@@ -82,7 +86,7 @@ class PerformanceService:
 
     # 수정
     async def update_performance(
-            self, 
+            self,
             performance_id: int,
             starts_at: datetime | None = None,
             ends_at: datetime | None = None,
@@ -96,7 +100,7 @@ class PerformanceService:
         festival = await self._festival_repo.find_by_id(performance.festival_id)
         if festival is None:
             raise FestivalNotFound()
-        
+
         performance.change_schedule(
             festival_starts_on=festival.starts_on,
             festival_ends_on=festival.ends_on,
@@ -116,11 +120,10 @@ class PerformanceService:
         performance.open()
         return await self._performance_repo.save(performance)
 
-
     # 취소 (꺼내기 -> 엔티티 메서드 -> 저장)
     async def cancel_performance(self, performance_id: int) -> Performance:
         performance = await self.get_performance(performance_id)
-        performance.cancel()
+        performance.cancel(now_utc())
         # TODO: 예매 일괄 취소 (회의 11/9)
         return await self._performance_repo.save(performance)
 
