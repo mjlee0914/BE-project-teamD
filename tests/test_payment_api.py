@@ -72,6 +72,7 @@ class PaymentAPITests(unittest.IsolatedAsyncioTestCase):
         self.access.ensure_owner.assert_awaited_once_with(1, 10)
         data = response.json()["data"]
         self.assertEqual(data["payment_id"], 7)
+        self.assertIsNone(data["updated_at"])
         self.assertNotIn("payment_key", data)
         self.assertNotIn("failed_reason", data)
         self.assertNotIn("payment_log", data)

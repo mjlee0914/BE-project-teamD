@@ -136,6 +136,9 @@ class AuthAPITests(unittest.IsolatedAsyncioTestCase):
                     )
                     self.assertEqual(response.status_code, 401)
                     self.assertEqual(response.headers.get("www-authenticate"), "Bearer")
+                    self.assertFalse(response.json()["success"])
+                    self.assertEqual(response.json()["code"], "HTTP_ERROR")
+                    self.assertNotIn("detail", response.json())
 
     async def test_invalid_token_is_401(self):
         response = await self.client.get(
@@ -143,6 +146,9 @@ class AuthAPITests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.headers.get("www-authenticate"), "Bearer")
+        self.assertFalse(response.json()["success"])
+        self.assertEqual(response.json()["code"], "HTTP_ERROR")
+        self.assertNotIn("detail", response.json())
         self.status_checker.ensure_active.assert_not_awaited()
 
     async def test_logout_rejects_invalid_token_without_adding_blacklist(self):
@@ -151,6 +157,9 @@ class AuthAPITests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.headers.get("www-authenticate"), "Bearer")
+        self.assertFalse(response.json()["success"])
+        self.assertEqual(response.json()["code"], "HTTP_ERROR")
+        self.assertNotIn("detail", response.json())
         self.blacklist.add.assert_not_awaited()
 
     async def test_logout_revokes_token_and_duplicate_logout_has_empty_response(self):

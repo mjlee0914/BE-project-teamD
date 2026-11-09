@@ -88,6 +88,27 @@ class PaymentRepositoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(rows[0].order_id, rows[1].order_id)
         self.assertEqual(await self.repo.find_by_reservation_id(999), [])
 
+    async def test_updated_at_is_null_until_first_change(self):
+        saved = await self.create()
+        self.assertIsNone(saved.updated_at)
+        self.sync.expire_all()
+        loaded = await self.repo.find_by_id(saved.payment_id)
+        self.assertIsNone(loaded.updated_at)
+
+        loaded.fail("declined")
+        changed = await self.repo.save(loaded)
+        self.assertIsNotNone(changed.updated_at)
+
+    async def test_status_constraint_rejects_unknown_value(self):
+        # ORM 타입 검사와 별개로 DB 자체도 Enum 밖의 상태를 거절해야 한다.
+        with self.assertRaises(IntegrityError):
+            self.sync.execute(
+                text(
+                    "INSERT INTO payments (reservation_id, amount, status, payment_log) "
+                    "VALUES (1, 1000, 'UNKNOWN', '[]')"
+                )
+            )
+
     async def test_approval_and_cancellation_round_trip(self):
         payment = await self.create()
         now = datetime.now(UTC)

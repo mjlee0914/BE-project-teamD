@@ -1,5 +1,16 @@
 # 결제 API 연결 준비
 
+## 모델 공통 규칙
+
+- 상태 컬럼은 PaymentStatus와 SQLEnum(native_enum=False, create_constraint=True)으로 정의한다.
+  허용 상태의 CHECK 제약은 Enum에서 생성하며 별도의 문자열 목록을 관리하지 않는다.
+- 생성·수정 시각은 공통 DateTimeMixin을 사용한다. 새 결제의 updated_at은 NULL이고 변경 시 시각을 기록한다.
+  도메인과 API 응답도 updated_at의 null을 허용한다.
+- 이 모델 수정만으로 기존 DB 테이블이 변경되지는 않는다. 이미 생성된 payments 테이블은
+  상태 컬럼 타입·CHECK 및 updated_at의 NULL 허용·기본값 변경을 별도 마이그레이션으로 반영해야 한다.
+
+## API 목록
+
 `presentation/router.py`에는 다음 API가 준비되어 있다.
 
 | 메서드 | 경로 | 기능 |

@@ -77,7 +77,7 @@ def _to_domain(model: PaymentModel, festival_name: str) -> Payment:
 
 # 도메인의 변경 가능한 필드를 ORM에 옮기고, 내부 메타데이터와 거래 이력을 JSON 목록으로 다시 구성한다.
 def _apply_changes(model: PaymentModel, payment: Payment) -> None:
-    model.status = payment.status.value
+    model.status = payment.status
     model.method = payment.method
     model.payment_key = payment.payment_key
     model.fail_reason = payment.failed_reason

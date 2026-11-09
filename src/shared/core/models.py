@@ -27,6 +27,7 @@ class DateTimeMixin:
 
 def init_models() -> None:
     """SQLAlchemy 모델 메타데이터 등록"""
+    import auth.infrastructure.models
     import festivals.infrastructure.models
     import payments.infrastructure.models
     import performances.infrastructure.models

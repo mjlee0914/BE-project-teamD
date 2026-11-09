@@ -1,3 +1,5 @@
+import subprocess
+import sys
 import unittest
 from unittest.mock import AsyncMock, Mock
 
@@ -12,6 +14,24 @@ from users.infrastructure.models import UserModel
 
 
 class TokenBlacklistRepositoryTests(unittest.IsolatedAsyncioTestCase):
+    def test_init_models_registers_blacklist_in_fresh_process(self):
+        # 다른 테스트의 auth import로 우연히 등록되지 않도록 새 프로세스에서 초기화 함수만 검사한다.
+        subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "from shared.core.models import Base, init_models; "
+                    "init_models(); "
+                    "assert 'token_blacklist' in Base.metadata.tables; "
+                    "assert 'users' in Base.metadata.tables"
+                ),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
     async def asyncSetUp(self):
         self.session = AsyncMock(spec=AsyncSession)
         self.repo = SqlAlchemyTokenBlacklistRepository(self.session)

@@ -37,7 +37,8 @@ class Payment:
     failed_reason: str | None = None
     cancelled_at: datetime | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    # 최초 생성에는 수정 이력이 없다. 상태가 바뀌면 각 도메인 메서드에서 시각을 기록한다.
+    updated_at: datetime | None = None
     # default_factory는 결제 객체마다 별도 목록을 만든다. 다른 결제와 이력이 공유되지 않는다.
     payment_log: list[PaymentLog] = field(default_factory=list)
     # 주문번호는 우리 서버가 결제 시도별로 만든다. payment_key는 결제창 인증 후 토스에서 받는다.

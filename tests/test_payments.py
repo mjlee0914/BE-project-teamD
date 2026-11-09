@@ -29,6 +29,7 @@ class PaymentDomainTests(unittest.TestCase):
         self.assertEqual(first.status, PaymentStatus.READY)
         self.assertIsNone(first.payment_id)
         self.assertIsNone(first.paid_at)
+        self.assertIsNone(first.updated_at)
         self.assertEqual(second.payment_log, [])
         self.assertNotEqual(first.order_id, second.order_id)
 

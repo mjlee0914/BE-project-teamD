@@ -58,7 +58,7 @@ class PaymentResponse(BaseModel):
     paid_at: datetime | None
     cancelled_at: datetime | None
     created_at: datetime
-    updated_at: datetime
+    updated_at: datetime | None
 
     # 엔티티 필드를 명시적으로 선택해 응답을 만든다. 엔티티에 필드가 추가되어도 자동으로 외부에 노출되지 않는다.
     @classmethod

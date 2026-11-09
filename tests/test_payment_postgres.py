@@ -11,6 +11,7 @@ from uuid import uuid4
 from dotenv import load_dotenv
 from sqlalchemy import insert, text
 from sqlalchemy.engine import make_url
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -136,6 +137,27 @@ class PaymentPostgresTests(unittest.IsolatedAsyncioTestCase):
         return await self.repository.save(
             Payment.create(self.reservation_id, "Test Festival", 1000)
         )
+
+    async def test_updated_at_is_null_until_first_change(self):
+        saved = await self.create()
+        self.assertIsNone(saved.updated_at)
+        loaded = await self.repository.find_by_id(saved.payment_id)
+        self.assertIsNone(loaded.updated_at)
+        loaded.fail("declined")
+        changed = await self.repository.save(loaded)
+        self.assertIsNotNone(changed.updated_at)
+        self.assertIsNotNone(changed.updated_at.utcoffset())
+
+    async def test_status_constraint_rejects_unknown_value(self):
+        # ORM의 입력 검사와 별개로 PostgreSQL CHECK가 허용되지 않은 상태를 막는지 확인한다.
+        with self.assertRaises(IntegrityError):
+            await self.session.execute(
+                text(
+                    "INSERT INTO payments (reservation_id, amount, status, payment_log) "
+                    "VALUES (:reservation_id, 1000, 'UNKNOWN', '[]'::jsonb)"
+                ),
+                {"reservation_id": self.reservation_id},
+            )
 
     async def test_jsonb_identity_metadata_and_timezone_round_trip(self):
         payment = await self.create()

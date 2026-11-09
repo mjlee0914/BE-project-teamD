@@ -55,7 +55,8 @@ from auth.infrastructure.repositories import SqlAlchemyTokenBlacklistRepository
 repository = SqlAlchemyTokenBlacklistRepository(session)
 ```
 
-auth ORM은 아직 공통 init_models와 wiring에 등록하지 않았다. 관련 공통 파일 수정은 별도 확인 후 진행한다.
+auth ORM은 공통 init_models에 등록했다. 모델 등록은 테이블 생성과 다르며, 실제 DB 적용은 별도 작업이다.
+원본 앱의 라우터·wiring 연결은 아직 반영하지 않았다.
 현재 개발 DB에 테이블을 영구 생성하지 않았다.
 
 검증 명령:
