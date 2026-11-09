@@ -19,8 +19,8 @@ from shared.core.exception_handlers import register_exception_handlers
 from users.presentation.routers.v1.router import router as user_router
 
 # 라우터 작성 후 주석 해제
-# from festivals.presentation.routers.v1.router import router as festival_router
-# from performances.presentation.routers.v1.router import router as performance_router
+from festivals.presentation.routers.v1.router import router as festival_router
+from performances.presentation.routers.v1.router import router as performance_router
 # from tickets.presentation.routers.v1.router import router as ticket_router
 # from auth.presentation.routers.v1.router import router as auth_router
 # from payments.presentation.routers.v1.router import router as payment_router
@@ -41,8 +41,8 @@ wire_dependencies(app)
 # 새 도메인 라우터를 만들면 위에서 import하고 여기에 include_router를 추가
 app.include_router(reservation_router)
 app.include_router(user_router)
-# app.include_router(performance_router)
-# app.include_router(festival_router)
+app.include_router(performance_router)
+app.include_router(festival_router)
 # app.include_router(ticket_router)
 # app.include_router(auth_router)
 # app.include_router(payment_router)

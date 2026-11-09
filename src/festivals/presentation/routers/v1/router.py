@@ -34,6 +34,7 @@ def _to_response(festival: Festival) -> FestivalResponse:
     )
 
 # 축제 생성
+# TODO(auth): 관리자 전용 - require_admin 붙이기
 @router.post("", status_code=201, response_model=APIResponse[FestivalResponse])
 async def create_festival(
     body: FestivalCreate, # 사용자가 보낸 JSON, FestivalCreate 스키마로 검사한 뒤 넣어준다. (형식 틀리면 함수 실행 전 422)
@@ -89,6 +90,7 @@ async def get_festival(
     return APIResponse.ok(data=_to_response(festival))
 
 # 축제 정보 수정
+# TODO(auth): 관리자 전용 - require_admin 붙이기
 @router.patch("/{festival_id}", response_model=APIResponse[FestivalResponse])
 async def update_festival(
     festival_id: int,
@@ -106,7 +108,8 @@ async def update_festival(
     return APIResponse.ok(data=_to_response(festival))
 
 # 축제 취소
-@router.post("/{festival_id}/cancel", response_model=APIResponse[FestivalResponse])
+# TODO(auth): 관리자 전용 - require_admin 붙이기
+@router.patch("/{festival_id}/cancel", response_model=APIResponse[FestivalResponse])
 async def cancel_festival(
     festival_id: int,
     service: FestivalServiceDep,
