@@ -221,7 +221,7 @@ class User:
         # [2] 본인 여부: 대상이 DB에 저장된 회원(id 존재)이면서 요청자 id와 같을 때 (규칙 15)
         is_owner = self.id is not None and self.id == requester.id
         # [3] 관리자 여부: 관리자는 다른 회원도 탈퇴 처리 가능
-        is_admin = requester.role == UserRole.ADMIN
+        is_admin = requester.is_admin
         # [4] 권한 검사: 본인, 관리자 둘 다 아니면 403
         if not (is_owner or is_admin):
             raise WithdrawPermissionDenied()
