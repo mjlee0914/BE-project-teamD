@@ -15,6 +15,7 @@
 """
 
 # users/domain/exceptions.py
+from shared.core.time import now_utc
 from users.domain.exceptions import DuplicateEmail, DuplicatePhone, UserNotFound
 
 # users/domain/repository.py
@@ -113,7 +114,7 @@ class UserService:
         requester = await self._get_user(requester_id)
         # TODO: 규칙 24(진행 중인 예매가 있으면 탈퇴 불가) → 예매 도메인 조회 방법이 정해지면 여기서 확인
         # [2] 도메인 규칙 실행: 이미 탈퇴 409, 본인·ADMIN이 아니면 403 (규칙 15, 16)
-        target.withdraw(requester=requester)
+        target.withdraw(requester=requester, now=now_utc())
         # [3] 저장: 행은 남기고 status=WITHDRAWN, deleted_at만 기록 (규칙 17)
         await self._user_repo.save(target)
 

@@ -35,7 +35,7 @@
 
 # 표준 라이브러리
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 # 프로젝트 코드
 from reservations.domain.enums import DiscountType, ReservationStatus
@@ -122,10 +122,10 @@ class Reservation:
         unit_price: int,  # 티켓 1장 가격
         festival_name: str,  # 스냅샷
         venue: str,  # 스냅샷
+        now: datetime,  # 현재 시각(UTC) - 서비스가 now_utc()로 넘겨줌
         discount_type: DiscountType = DiscountType.NONE,
     ) -> "Reservation":
 
-        now = datetime.now(UTC)
         created_at = now
         expires_at = now + timedelta(hours=DEPOSIT_EXPIRE_HOURS)
         total_price = unit_price * quantity
@@ -147,12 +147,12 @@ class Reservation:
             final_price=final_price,
         )
 
-    def confirm(self) -> None:  # 예매 승인 상태로 변경, 예매 승인 시간 추가
+    # 예매 승인 상태로 변경, 예매 승인 시간 추가
+    def confirm(self, now: datetime) -> None:
         if self.status != ReservationStatus.PENDING:
             raise InvalidReservationStatus(
                 f"예매 승인 시 상태는 PENDING 상태여야 합니다. [현재 상태 : {self.status}]"
             )
-        now = datetime.now(UTC)
         # 입금 기한이 지난 예매는 승인할 수 없다.
         if self.expires_at is not None and now > self.expires_at:
             raise DepositDeadlineViolation(
@@ -162,24 +162,25 @@ class Reservation:
         self.status = ReservationStatus.CONFIRMED
         self.confirmed_at = now
 
-    def expire(self) -> None:  # 예매 만료 상태로 변경
+    def expire(self, now: datetime) -> None:  # 예매 만료 상태로 변경
         if self.status != ReservationStatus.PENDING:
             raise InvalidReservationStatus(
                 f"예매 만료 시 상태는 PENDING 상태여야 합니다. [현재 상태 : {self.status}]"
             )
         # 입금 기한이 지나지 않은 예매는 만료할 수 없다.
-        if self.expires_at is not None and datetime.now(UTC) <= self.expires_at:
+        if self.expires_at is not None and now <= self.expires_at:
             raise DepositDeadlineViolation(
                 f"입금 기한이 지나지 않아 예매를 만료할 수 없습니다. [입금 기한 : {self.expires_at}]"
             )
 
         self.status = ReservationStatus.EXPIRED
 
-    def cancel(self) -> None:  # 예매 취소 상태로 변경, 예매 취소 시간 추가
+    # 예매 취소 상태로 변경, 예매 취소 시간 추가
+    def cancel(self, now: datetime) -> None:
         if self.status not in (ReservationStatus.PENDING, ReservationStatus.CONFIRMED):
             raise InvalidReservationStatus(
                 f"예매 취소 시 상태는 PENDING or CONFIRMED 상태여야 합니다. [현재 상태 : {self.status}]"
             )
 
         self.status = ReservationStatus.CANCELED
-        self.canceled_at = datetime.now(UTC)
+        self.canceled_at = now

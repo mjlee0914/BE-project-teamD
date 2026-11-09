@@ -221,6 +221,7 @@ class ReservationService:
             festival_name=festival.name,
             venue=festival.venue,
             discount_type=discount_type,
+            now=now,
         )
 
         # 저장 후 반환
@@ -294,7 +295,7 @@ class ReservationService:
 
         # ④ 예매 상태 변경
         # - 상태 변경 규칙은 엔티티가 판단 (CANCELED·EXPIRED 예매를 다시 취소하면 엔티티가 409)
-        selected_reservation.cancel()
+        selected_reservation.cancel(now)
 
         # ⑤ 잔여 수량 복구
         # - 예매 생성 때 decrease_remaining으로 줄였던 수량을 그대로 되돌림
