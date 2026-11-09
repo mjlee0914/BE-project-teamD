@@ -30,6 +30,12 @@ class InvalidTicketPerformanceTime(UnprocessableException):
         super().__init__(message=message, error_code="INVALID_TICKET_PERFORMANCE_TIME")
 
 
+# 현재 상태에서 허용되지 않은 상태변경
+class InvalidTicketStatus(ConflictException):
+    def __init__(self, message: str = "현재 상태에서는 처리할 수 없는 요청입니다."):
+        super().__init__(message=message, error_code="INVALID_TICKET_STATUS")
+
+
 # 취소할 수 없는 티켓
 class TicketNotCancelable(ConflictException):
     def __init__(self, message: str = "취소할 수 없는 티켓입니다."):
@@ -40,3 +46,11 @@ class TicketNotCancelable(ConflictException):
 class TicketNotEnterable(ConflictException):
     def __init__(self, message: str = "입장할 수 없는 티켓입니다."):
         super().__init__(message=message, error_code="TICKET_NOT_ENTERABLE")
+
+
+# 낙관적 락: 조회한 뒤 저장하기 전에 다른 요청이 먼저 티켓을 변경함 (version 불일치)
+class TicketVersionConflict(ConflictException):
+    def __init__(
+        self, message: str = "다른 요청이 먼저 티켓을 변경했습니다. 다시 시도해 주세요."
+    ):
+        super().__init__(message=message, error_code="TICKET_VERSION_CONFLICT")
