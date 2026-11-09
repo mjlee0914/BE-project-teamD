@@ -38,13 +38,14 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 # 프로젝트 코드
-from reservations.domain.enums import DiscountType, ReservationStatus, TicketType
+from reservations.domain.enums import DiscountType, ReservationStatus
 from reservations.domain.exceptions import (
     DepositDeadlineViolation,
     InvalidReservationPrice,
     InvalidReservationQuantity,
     InvalidReservationStatus,
 )
+from shared.core.enums import TicketType
 
 DEPOSIT_EXPIRE_HOURS = 24  # 예매 대기 시간
 MAX_QUANTITY_PER_RESERVATION = 2  # 티켓 최대 수량

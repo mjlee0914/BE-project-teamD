@@ -31,10 +31,6 @@
 - PR #95가 dev에 머지되기 전에는 이 파일을 import하면 PerformanceRepository가 없어 ImportError가 남
 """
 
-# 표준 라이브러리 : 현재 시각(UTC)과 한국 시간대 변환
-from datetime import UTC, datetime
-from zoneinfo import ZoneInfo
-
 # 축제 도메인 : 축제 조회, 축제 상태 Enum, 축제가 없을 때 예외
 from festivals.domain.enums import FestivalStatus
 from festivals.domain.exceptions import FestivalNotFound
@@ -46,7 +42,7 @@ from performances.domain.performance import Performance
 from performances.domain.repository import PerformanceRepository
 
 # 예매 도메인 : 저장소 추상 클래스, 엔티티, Enum, 예외, 한도 검사 규칙
-from reservations.domain.enums import DiscountType, ReservationStatus, TicketType
+from reservations.domain.enums import DiscountType, ReservationStatus
 from reservations.domain.exceptions import (
     CancelDeadlineViolation,
     ReservationNotAvailable,
@@ -56,11 +52,15 @@ from reservations.domain.repository import ReservationRepository
 from reservations.domain.reservation import Reservation
 from reservations.domain.service import check_daily_limit
 
+# 공통 : 티켓 종류 Enum, 한국 시간대·현재 시각 함수
+from shared.core.enums import TicketType
+from shared.core.time import KST, now_utc, today_kst
+
 # 한국 시간대
 # - 시각 저장·비교는 UTC로 하고, "몇 월 며칠 / 무슨 요일"을 판단할 때만 KST로 바꾼다
 # - UTC 기준으로 요일을 보면 한국 토요일 새벽 공연이 금요일로 잘못 계산될 수 있음
 #   ex) 2026-11-06 15:30 UTC → 2026-11-07 00:30 KST (금요일 X, 토요일 O)
-KST = ZoneInfo("Asia/Seoul")
+#   → KST 상수는 shared.core.time에서 가져옴
 
 # 티켓 종류별로 필요한 회차의 요일 (datetime.weekday() 기준 : 월=0 … 토=5, 일=6)
 # - 값을 전부 리스트로 둔 이유
@@ -142,9 +142,8 @@ class ReservationService:
         # 현재 시각 준비
         # - now : UTC 시각. 예매 기간처럼 "시각끼리 비교"할 때 그대로 사용 (④)
         # - today : 한국 날짜. 축제 상태처럼 "날짜"로 판단할 때 사용 (②)
-        now = datetime.now(UTC)
-        now_kst = now.astimezone(KST)
-        today = now_kst.date()
+        now = now_utc()
+        today = today_kst()
 
         # ① 축제 조회
         # - 사용자가 보낸 festival_id가 실제로 있는 축제인지 확인
@@ -282,7 +281,7 @@ class ReservationService:
         )
 
         # 현재 시각 (UTC) : 취소 마감 시각과 "시각끼리" 비교하므로 KST로 바꿀 필요 없음
-        now = datetime.now(UTC)
+        now = now_utc()
 
         # ③ 취소 마감 확인
         # - PENDING(입금 전) 예매는 돈이 오가지 않았으므로 마감과 상관없이 취소 가능
