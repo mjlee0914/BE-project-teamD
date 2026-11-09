@@ -264,3 +264,4 @@ docker compose up -d
 ```
 
 > 💡 다른 PostgreSQL도 같이 켜 둬야 한다면 `docker-compose.yaml`의 포트를 `"5433:5432"`로 바꾸고, `.env`의 `DATABASE_URL`도 `localhost:5433`으로 바꿈. 이 변경은 본인 PC에만 하고 커밋하지 말 것.
+
