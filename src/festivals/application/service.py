@@ -110,7 +110,7 @@ class FestivalService:
         if starts_on is not None or ends_on is not None:
             # 축제 첫날 00:00 KST
             # combine(날짜, 시각, tzinfo) = 날짜 + 시각 + 시간대 합쳐 datetime 하나로 만듦.
-            # 날짜에는 요청값이 아닌 엔티티 값을 씀: 기존 시작일
+            # 날짜에는 요청값이 아닌 엔티티 값을 씀: 변경이 반영된 시작일
             period_start = datetime.combine(festival.starts_on, time.min, tzinfo=KST)
 
             # 축제 마지막 날(다음 날) 00:00 KST
