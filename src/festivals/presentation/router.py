@@ -1,5 +1,4 @@
 from dataclasses import asdict
-from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -13,9 +12,7 @@ from festivals.presentation.schemas import (
     FestivalUpdate,
 )
 from shared.core.schemas import APIResponse, PageResponse
-
-KST = timezone(timedelta(hours=9))
-
+from shared.core.time import today_kst
 
 router = APIRouter(prefix="/v1/festivals", tags=["festivals"])
 
@@ -27,7 +24,7 @@ FestivalServiceDep = Annotated[FestivalService, Depends(get_festival_service)]
 # 응답 만드는 helper 함수
 # 축제 응답에 계산된 status가 들어갈 수 있도록 추가함.
 def _to_response(festival: Festival) -> FestivalResponse:
-    today = datetime.now(KST).date()
+    today = today_kst()
 
     return FestivalResponse.model_validate(
         {

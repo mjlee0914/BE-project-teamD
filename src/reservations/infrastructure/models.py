@@ -12,7 +12,8 @@ from sqlalchemy import (
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
-from reservations.domain.enums import DiscountType, ReservationStatus, TicketType
+from reservations.domain.enums import DiscountType, ReservationStatus
+from shared.core.enums import TicketType
 from shared.core.models import Base
 
 
