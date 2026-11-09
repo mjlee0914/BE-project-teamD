@@ -20,19 +20,19 @@ router/service/domain에서 raise NotFoundException("3번 예매가 없습니다
 
 # 외부 라이브러리
 from fastapi import FastAPI, Request, status
-from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 # 프로젝트 코드
-from shared.core.exceptions import SharedException
+from shared.core.exceptions import SharedException, UnauthorizedException
 from shared.core.logger import get_logger
 from shared.core.schemas import APIResponse
 
 logger = get_logger(__name__)
 
 
-# app에 예외 핸들러 3개를 등록하는 함수 (main.py에서 호출)
+# app에 예외 핸들러 4개를 등록하는 함수 (main.py에서 호출)
 # @app.exception_handler(예외 클래스): 해당 예외(와 그 하위 예외)가 발생하면 아래 함수를 실행하도록 등록
 def register_exception_handlers(app: FastAPI) -> None:
     # 1. 비즈니스 예외 (SharedException 및 하위 예외)
@@ -58,7 +58,12 @@ def register_exception_handlers(app: FastAPI) -> None:
 
         # model_dump(mode="json"): 응답 객체를 JSON으로 보낼 수 있는 dict로 변환 (datetime → 문자열 등)
         return JSONResponse(
-            status_code=exc.status_code, content=response_dto.model_dump(mode="json")
+            status_code=exc.status_code,
+            content=response_dto.model_dump(mode="json"),
+            # 인증 실패의 HTTP 표현은 여기서 통일한다. 다른 업무 예외에는 인증 헤더를 붙이지 않는다.
+            headers={"WWW-Authenticate": "Bearer"}
+            if isinstance(exc, UnauthorizedException)
+            else None,
         )
 
     # 2. Pydantic 스키마 검증 실패 (422)

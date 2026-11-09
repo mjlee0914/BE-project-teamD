@@ -89,11 +89,15 @@ class AuthAPITests(unittest.IsolatedAsyncioTestCase):
         response = await self.login()
         self.assertEqual(response.status_code, 401)
         self.assertFalse(response.json()["success"])
+        self.assertEqual(response.json()["code"], "UNAUTHORIZED")
+        self.assertEqual(response.headers.get("www-authenticate"), "Bearer")
         self.assertNotIn("access_token", response.text)
 
     async def test_withdrawn_login_returns_403(self):
         self.credentials.verify_credentials.side_effect = InactiveUser()
-        self.assertEqual((await self.login()).status_code, 403)
+        response = await self.login()
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn("www-authenticate", response.headers)
 
     async def test_invalid_login_body_is_rejected_without_echoing_password(self):
         for body in (
@@ -137,7 +141,7 @@ class AuthAPITests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(response.status_code, 401)
                     self.assertEqual(response.headers.get("www-authenticate"), "Bearer")
                     self.assertFalse(response.json()["success"])
-                    self.assertEqual(response.json()["code"], "HTTP_ERROR")
+                    self.assertEqual(response.json()["code"], "UNAUTHORIZED")
                     self.assertNotIn("detail", response.json())
 
     async def test_invalid_token_is_401(self):
@@ -147,7 +151,7 @@ class AuthAPITests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.headers.get("www-authenticate"), "Bearer")
         self.assertFalse(response.json()["success"])
-        self.assertEqual(response.json()["code"], "HTTP_ERROR")
+        self.assertEqual(response.json()["code"], "UNAUTHORIZED")
         self.assertNotIn("detail", response.json())
         self.status_checker.ensure_active.assert_not_awaited()
 
@@ -158,7 +162,7 @@ class AuthAPITests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.headers.get("www-authenticate"), "Bearer")
         self.assertFalse(response.json()["success"])
-        self.assertEqual(response.json()["code"], "HTTP_ERROR")
+        self.assertEqual(response.json()["code"], "UNAUTHORIZED")
         self.assertNotIn("detail", response.json())
         self.blacklist.add.assert_not_awaited()
 

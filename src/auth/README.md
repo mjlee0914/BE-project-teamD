@@ -148,6 +148,9 @@ DB 조회 오류는 인증 성공으로 처리하지 않는다.
 다른 API는 `auth.presentation.dependencies.get_current_user`를 의존 함수로 사용할 수 있다.
 이 함수는 Bearer 토큰과 현재 회원 상태를 모두 검증한 TokenPayload만 반환한다.
 누락·잘못된 인증 헤더와 무효 토큰은 401이며 WWW-Authenticate: Bearer 헤더를 반환한다.
+auth는 UnauthorizedException을 그대로 전파하고, 공통 SharedException 핸들러가
+APIResponse.fail(code="UNAUTHORIZED")와 WWW-Authenticate: Bearer 헤더를 생성한다.
+라우터·의존성에서 인증 예외를 HTTPException으로 변환하지 않는다.
 
 로그아웃은 Authorization: Bearer 헤더만 사용한다. get_current_user를 먼저 호출하지 않아
 같은 토큰의 중복 로그아웃과 탈퇴 후 로그아웃을 허용한다. 만료·위조 토큰은 401이다.

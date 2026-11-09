@@ -9,7 +9,7 @@ from auth.application.service import AuthService
 from auth.domain.entities import TokenPayload
 from shared.core.exceptions import UnauthorizedException
 
-# auto_error=False로 누락 처리를 직접 맡아 일관된 401과 WWW-Authenticate 헤더를 만든다.
+# 누락 처리를 UnauthorizedException으로 통일한다. HTTP 응답과 인증 헤더는 공통 핸들러가 만든다.
 bearer = HTTPBearer(auto_error=False)
 
 
@@ -18,11 +18,7 @@ def require_bearer_token(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
 ) -> str:
     if credentials is None:
-        raise HTTPException(
-            status_code=401,
-            detail="인증 토큰이 필요합니다.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise UnauthorizedException("인증 토큰이 필요합니다.")
     return credentials.credentials
 
 
@@ -32,14 +28,9 @@ def provide_auth_service() -> AuthService:
     raise HTTPException(status_code=503, detail="인증 서비스 연결이 필요합니다.")
 
 
-# AuthService로 토큰을 검증한다. 401에는 WWW-Authenticate 헤더를 붙여 인증이 필요한 응답임을 알린다.
+# AuthService로 토큰을 검증한다. 인증 예외를 HTTPException으로 바꾸지 않고 공통 핸들러에 맡긴다.
 async def get_current_user(
     token: Annotated[str, Depends(require_bearer_token)],
     service: Annotated[AuthService, Depends(provide_auth_service)],
 ) -> TokenPayload:
-    try:
-        return await service.authenticate_token(token)
-    except UnauthorizedException as exc:
-        raise HTTPException(
-            status_code=401, detail=exc.message, headers={"WWW-Authenticate": "Bearer"}
-        ) from None
+    return await service.authenticate_token(token)

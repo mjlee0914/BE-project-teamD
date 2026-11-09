@@ -2,12 +2,11 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, Response
 
 from auth.application.service import AuthService
 from auth.presentation.dependencies import provide_auth_service, require_bearer_token
 from auth.presentation.schemas import LoginRequest, TokenResponse
-from shared.core.exceptions import UnauthorizedException
 from shared.core.schemas import APIResponse
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
@@ -37,10 +36,6 @@ async def logout(
     token: Annotated[str, Depends(require_bearer_token)], service: Service
 ) -> Response:
     # get_current_user는 사용하지 않아 중복 로그아웃/탈퇴 후 토큰 차단도 허용한다.
-    try:
-        await service.logout(token)
-    except UnauthorizedException as exc:
-        raise HTTPException(
-            status_code=401, detail=exc.message, headers={"WWW-Authenticate": "Bearer"}
-        ) from None
+    # 인증 실패는 그대로 전파한다. 공통 핸들러가 실패 응답과 인증 헤더를 만든다.
+    await service.logout(token)
     return Response(status_code=204, headers={"Cache-Control": "no-store"})

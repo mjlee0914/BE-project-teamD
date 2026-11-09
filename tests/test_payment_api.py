@@ -2,8 +2,7 @@ import unittest
 from unittest.mock import AsyncMock
 
 import httpx
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 
 from auth.application.service import AuthService
 from auth.domain.entities import TokenPayload
@@ -17,9 +16,9 @@ from payments.presentation.dependencies import (
     provide_payment_service,
 )
 from payments.presentation.router import router
+from shared.core.exception_handlers import register_exception_handlers
 from shared.core.exceptions import (
     ForbiddenException,
-    SharedException,
     UnauthorizedException,
 )
 
@@ -27,13 +26,8 @@ from shared.core.exceptions import (
 class PaymentAPITests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.app = FastAPI()
+        register_exception_handlers(self.app)
         self.app.include_router(router)
-
-        @self.app.exception_handler(SharedException)
-        async def handle_domain_error(_: Request, exc: SharedException):
-            return JSONResponse(
-                status_code=exc.status_code, content={"code": exc.error_code}
-            )
 
         self.payment = Payment.create(1, "Festival", 1000)
         self.payment.payment_id = 7
@@ -82,12 +76,18 @@ class PaymentAPITests(unittest.IsolatedAsyncioTestCase):
     async def test_missing_token_is_rejected(self):
         response = await self.client.get("/v1/payments/7")
         self.assertEqual(response.status_code, 401)
+        self.assertFalse(response.json()["success"])
+        self.assertEqual(response.json()["code"], "UNAUTHORIZED")
+        self.assertEqual(response.headers.get("www-authenticate"), "Bearer")
         self.service.get_payment.assert_not_awaited()
 
     async def test_invalid_token_is_rejected(self):
         self.auth.authenticate_token.side_effect = UnauthorizedException()
         response = await self.client.get("/v1/payments/7", headers=self.headers)
         self.assertEqual(response.status_code, 401)
+        self.assertFalse(response.json()["success"])
+        self.assertEqual(response.json()["code"], "UNAUTHORIZED")
+        self.assertEqual(response.headers.get("www-authenticate"), "Bearer")
         self.service.get_payment.assert_not_awaited()
 
     async def test_unconfigured_dependencies_do_not_allow_payment(self):
