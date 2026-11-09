@@ -46,6 +46,10 @@
 23. ACTIVE가 아닌(WITHDRAWN) 회원이 이용하려 하면 도메인 오류가 발생한다.
 24. 진행 중인 예매가 있을 경우 탈퇴가 불가하다. (예매 조회가 필요하므로 application(service)에서 확인한다)
 
+[관리자 검증]
+25. 관리자 전용 기능(축제, 공연 등록 등)은 role이 ADMIN인 회원만 사용 가능하다.
+26. 관리자 전용 기능도 ACTIVE 회원만 사용할 수 있다. (탈퇴한 ADMIN은 사용 불가)
+
 [보류]
 - 전화번호 삭제(값을 비우는 수정)
 - 로그인 실패(401)는 auth 도메인에서 처리
@@ -65,6 +69,7 @@ from users.domain.enums import UserRole, UserStatus
 
 # exceptions.py
 from users.domain.exceptions import (
+    AdminPermissionDenied,
     InactiveUser,
     InvalidEmail,
     InvalidName,
@@ -253,6 +258,23 @@ class User:
     def is_active(self) -> bool:
         # ACTIVE만 True, WITHDRAWN은 False (규칙 22)
         return self.status == UserStatus.ACTIVE
+
+    # [관리자 여부 확인]
+    @property
+    def is_admin(self) -> bool:
+        # ADMIN만 True, USER는 False (규칙 25)
+        return self.role == UserRole.ADMIN
+
+    # [관리자 검사]
+    # 관리자 전용 기능 시작 전에 한 줄로 사용 -> 통과하면 아무 일도 없음
+    def ensure_admin(self) -> None:
+        # [1] 탈퇴 회원 먼저 차단 -> 403 InactiveUser (규칙 26)
+        self.ensure_active()
+        # [2] ADMIN이 아니면 403 (규칙 25)
+        if not self.is_admin:
+            raise AdminPermissionDenied(
+                f"관리자만 이용할 수 있습니다. [현재 권한 : {self.role}]"
+            )
 
     # [이메일 형식 검증]
     # @staticmethod: self/cls가 필요 없는 순수 검사 함수 → 클래스 안에 두어 응집도 유지
