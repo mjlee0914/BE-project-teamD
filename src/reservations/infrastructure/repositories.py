@@ -40,13 +40,16 @@ domain/repository.py에서 정의한 추상 클래스를 실제 DB로 구현하�
 """
 
 # 외부 라이브러리
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from reservations.domain.enums import ReservationStatus
 
 # 프로젝트 코드
 from reservations.domain.repository import ReservationRepository
 from reservations.domain.reservation import Reservation
 from reservations.infrastructure.models import Reservation as ReservationModel
+from shared.core.enums import TicketType
 
 
 class SqlalchemyReservationRepository(ReservationRepository):
@@ -135,3 +138,58 @@ class SqlalchemyReservationRepository(ReservationRepository):
             result.append(self._to_entity(model))
 
         return result
+
+    # 관리자의 축제 모든 예매 목록 조회
+    async def find_festival_reservation(
+        self,
+        festival_id: int,
+        ticket_types: list[TicketType] | None,
+        statuses: list[ReservationStatus] | None,
+        offset: int,
+        limit: int,
+    ) -> list[Reservation]:
+
+        stmt = select(ReservationModel).where(
+            ReservationModel.festival_id == festival_id
+        )
+
+        if ticket_types is not None:
+            stmt = stmt.where(ReservationModel.ticket_type.in_(ticket_types))
+        if statuses is not None:
+            stmt = stmt.where(ReservationModel.status.in_(statuses))
+
+        stmt = (
+            stmt.order_by(
+                ReservationModel.created_at.desc(), ReservationModel.id.desc()
+            )
+            .offset(offset)
+            .limit(limit)
+        )
+
+        models = (await self.session.scalars(stmt)).all()
+
+        result = []
+
+        for model in models:
+            result.append(self._to_entity(model))
+
+        return result
+
+    async def count_festival_reservation(
+        self,
+        festival_id: int,
+        ticket_types: list[TicketType] | None,
+        statuses: list[ReservationStatus] | None,
+    ) -> int:
+
+        stmt = select(func.count()).select_from(ReservationModel)
+
+        stmt = stmt.where(ReservationModel.festival_id == festival_id)
+
+        if ticket_types is not None:
+            stmt = stmt.where(ReservationModel.ticket_type.in_(ticket_types))
+        if statuses is not None:
+            stmt = stmt.where(ReservationModel.status.in_(statuses))
+
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
