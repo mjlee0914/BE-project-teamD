@@ -19,6 +19,11 @@ router = APIRouter(
 
 PerformanceServiceDep = Annotated[PerformanceService, Depends(get_performance_service)]
 
+# 인자가 오는 곳 (규칙 붙일 때 쓰는 것)
+# - 경로 /performances/5      → performance_id: int  (Path)
+# - 쿼리 ?festival_id=1        → festival_id: int     (Query)
+# - JSON body                → body: PerformanceCreate (스키마의 Field)
+
 # 공연 회차 등록
 # TODO(auth): 관리자 전용 - require_admin 붙이기
 # POST ??? (축제 id를 받는 경로 미정: Slack 결정 확인)
@@ -47,7 +52,7 @@ async def create_performance(
 async def list_performances(
     festival_id: int,
     service: PerformanceServiceDep,
-    page: Annotated[int, Query(ge=1)] = 1,
+    page: Annotated[int, Query(ge=1)] = 1, # Query=엔드포인트 함수 인자의 숫자 검사기 역할. "1이상, 100 이하만 받는다" 없으면 서버가 그냥 계산하다 터짐.
     size : Annotated[int, Query(ge=1, le=100)] = 100
 ):
     performances, total = await service.list_performances(festival_id=festival_id, page=page, size=size)
