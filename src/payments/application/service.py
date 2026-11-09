@@ -119,7 +119,7 @@ class PaymentService:
         result = await self.processor.cancel(
             payment_key, reason=reason, refund_account=refund_account
         )
-        payment.cancel(result.cancelled_at, result.log)
+        payment.cancel(result.canceled_at, result.log)
         return await self.payment_repo.save(payment)
 
     # 신뢰할 수 있는 예매 정보·금액으로 새 결제 시도를 저장한다. 클라이언트용 공개 생성 API는 아니다.

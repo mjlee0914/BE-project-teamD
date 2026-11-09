@@ -59,7 +59,7 @@ def _to_domain(model: PaymentModel, festival_name: str) -> Payment:
         payment_key=model.payment_key,
         failed_reason=model.fail_reason,
         paid_at=model.paid_at,
-        cancelled_at=model.cancelled_at,
+        canceled_at=model.canceled_at,
         created_at=model.created_at,
         updated_at=model.updated_at,
         order_id=order_id,
@@ -82,7 +82,7 @@ def _apply_changes(model: PaymentModel, payment: Payment) -> None:
     model.payment_key = payment.payment_key
     model.fail_reason = payment.failed_reason
     model.paid_at = payment.paid_at
-    model.cancelled_at = payment.cancelled_at
+    model.canceled_at = payment.canceled_at
     # JSON 목록을 통째로 교체해 ORM이 변경을 추적하게 한다.
     # 기존 JSONB 안의 첫 항목에 주문번호·웹훅 검증 해시·처리 이벤트를 저장한다.
     # 전용 컬럼을 추가하지 않은 현재 저장 규칙이므로 조회 쿼리·인덱스도 같은 경로를 사용한다.

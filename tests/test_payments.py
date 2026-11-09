@@ -104,7 +104,7 @@ class PaymentServiceTests(unittest.IsolatedAsyncioTestCase):
             "key", reason="고객 요청", refund_account=None
         )
         self.assertEqual(result.status, PaymentStatus.CANCELED)
-        self.assertEqual(result.cancelled_at, now)
+        self.assertEqual(result.canceled_at, now)
         self.assertEqual(self.repo.save.await_count, 3)
 
     async def test_duplicate_approval_does_not_call_processor(self):
@@ -151,7 +151,7 @@ class PaymentServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_repeated_cancellation_does_not_call_provider(self):
         self.payment.status = PaymentStatus.CANCELED
-        self.payment.cancelled_at = datetime.now(UTC)
+        self.payment.canceled_at = datetime.now(UTC)
         result = await self.service.cancel(7)
         self.assertIs(result, self.payment)
         self.processor.cancel.assert_not_awaited()
@@ -190,7 +190,7 @@ class PaymentServiceTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(PaymentProcessingError):
             await self.service.cancel(7)
         self.assertEqual(self.payment.status, PaymentStatus.DONE)
-        self.assertIsNone(self.payment.cancelled_at)
+        self.assertIsNone(self.payment.canceled_at)
         self.repo.save.assert_not_awaited()
 
     async def test_missing_payment(self):

@@ -35,7 +35,7 @@ class Payment:
     paid_at: datetime | None = None
     payment_key: str | None = None
     failed_reason: str | None = None
-    cancelled_at: datetime | None = None
+    canceled_at: datetime | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     # 최초 생성에는 수정 이력이 없다. 상태가 바뀌면 각 도메인 메서드에서 시각을 기록한다.
     updated_at: datetime | None = None
@@ -118,11 +118,11 @@ class Payment:
         return self.payment_key
 
     # 취소 가능 여부를 확인하고 CANCELED·취소 시각·이력을 갱신한다. 외부 취소 요청 자체는 하지 않는다.
-    def cancel(self, cancelled_at: datetime, log: PaymentLog) -> None:
+    def cancel(self, canceled_at: datetime, log: PaymentLog) -> None:
         self._validate_log(log)
         self.ensure_cancelable()
         self.status = PaymentStatus.CANCELED
-        self.cancelled_at = cancelled_at
+        self.canceled_at = canceled_at
         self.add_payment_log(log)
         self.updated_at = datetime.now(UTC)
 
@@ -157,7 +157,7 @@ class Payment:
         *,
         status: PaymentStatus,
         paid_at: datetime | None,
-        cancelled_at: datetime | None,
+        canceled_at: datetime | None,
         method: str | None,
         webhook_secret_hash: str | None,
         log: PaymentLog,
@@ -199,13 +199,13 @@ class Payment:
             raise PaymentStatusException
         if status == PaymentStatus.DONE and paid_at is None:
             raise PaymentStatusException("입금 완료 시각이 필요합니다.")
-        if status == PaymentStatus.CANCELED and cancelled_at is None:
+        if status == PaymentStatus.CANCELED and canceled_at is None:
             raise PaymentStatusException("취소 완료 시각이 필요합니다.")
         if status == PaymentStatus.WAITING_FOR_DEPOSIT and paid_at is not None:
             raise PaymentStatusException
         self.status = status
         self.paid_at = paid_at
-        self.cancelled_at = cancelled_at
+        self.canceled_at = canceled_at
         self.method = method
         if webhook_secret_hash is not None:
             self.webhook_secret_hash = webhook_secret_hash

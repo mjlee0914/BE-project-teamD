@@ -188,7 +188,7 @@ class PaymentPostgresTests(unittest.IsolatedAsyncioTestCase):
         loaded = await self.repository.find_by_id(payment.payment_id)
         self.assertEqual(loaded.status, PaymentStatus.CANCELED)
         self.assertEqual(loaded.paid_at, now)
-        self.assertEqual(loaded.cancelled_at, now)
+        self.assertEqual(loaded.canceled_at, now)
 
     async def test_stale_write_is_rejected(self):
         first = await self.create()

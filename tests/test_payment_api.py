@@ -73,6 +73,8 @@ class PaymentAPITests(unittest.IsolatedAsyncioTestCase):
         data = response.json()["data"]
         self.assertEqual(data["payment_id"], 7)
         self.assertIsNone(data["updated_at"])
+        self.assertIn("canceled_at", data)
+        self.assertNotIn("cancelled_at", data)
         self.assertNotIn("payment_key", data)
         self.assertNotIn("failed_reason", data)
         self.assertNotIn("payment_log", data)

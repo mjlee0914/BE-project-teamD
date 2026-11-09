@@ -26,7 +26,7 @@ class PaymentSnapshot:
     amount: int
     status: PaymentStatus
     paid_at: datetime | None
-    cancelled_at: datetime | None
+    canceled_at: datetime | None
     log: PaymentLog
     method: str | None = None
     webhook_secret_hash: str | None = None
@@ -35,7 +35,7 @@ class PaymentSnapshot:
 # 외부 전액 취소가 완료된 시각과 저장 가능한 이력을 반환하는 데이터다.
 @dataclass(frozen=True)
 class PaymentCancellationResult:
-    cancelled_at: datetime
+    canceled_at: datetime
     log: PaymentLog
 
 

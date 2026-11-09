@@ -33,7 +33,7 @@ class PaymentModel(DateTimeMixin, Base):
             "status <> 'DONE' OR paid_at IS NOT NULL", name="ck_payments_done_paid_at"
         ),
         CheckConstraint(
-            "status <> 'CANCELED' OR cancelled_at IS NOT NULL",
+            "status <> 'CANCELED' OR canceled_at IS NOT NULL",
             name="ck_payments_canceled_at",
         ),
         UniqueConstraint("payment_key", name="uq_payments_payment_key"),
@@ -68,7 +68,7 @@ class PaymentModel(DateTimeMixin, Base):
     paid_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    cancelled_at: Mapped[datetime | None] = mapped_column(
+    canceled_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     # 생성·수정 시각은 공통 DateTimeMixin을 따른다. 최초 생성의 updated_at은 NULL이다.

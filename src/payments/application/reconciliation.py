@@ -20,7 +20,7 @@ def apply_snapshot(payment: Payment, snapshot: PaymentSnapshot) -> None:
     payment.synchronize(
         status=snapshot.status,
         paid_at=snapshot.paid_at,
-        cancelled_at=snapshot.cancelled_at,
+        canceled_at=snapshot.canceled_at,
         method=snapshot.method if snapshot.method is not None else payment.method,
         webhook_secret_hash=snapshot.webhook_secret_hash,
         log=snapshot.log,

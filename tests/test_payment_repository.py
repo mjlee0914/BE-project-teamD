@@ -131,7 +131,7 @@ class PaymentRepositoryTests(unittest.IsolatedAsyncioTestCase):
         self.sync.expire_all()
         canceled = await self.repo.find_by_id(payment.payment_id)
         self.assertEqual(canceled.status, PaymentStatus.CANCELED)
-        self.assertIsNotNone(canceled.cancelled_at)
+        self.assertIsNotNone(canceled.canceled_at)
         self.assertEqual(len(canceled.payment_log), 2)
         self.assertEqual(
             self.sync.scalar(
@@ -283,7 +283,7 @@ class PaymentRepositoryTests(unittest.IsolatedAsyncioTestCase):
                 "payment_key",
                 "fail_reason",
                 "paid_at",
-                "cancelled_at",
+                "canceled_at",
                 "created_at",
                 "updated_at",
                 "payment_log",

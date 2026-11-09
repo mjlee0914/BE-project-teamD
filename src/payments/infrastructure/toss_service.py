@@ -126,7 +126,7 @@ class TossPaymentProcessor(PaymentProcessor):
             status == PaymentStatus.CANCELED and data.get("approvedAt") is not None
         ):
             paid_at = self._parse_time(data.get("approvedAt"))
-        cancelled_at = None
+        canceled_at = None
         if status == PaymentStatus.CANCELED:
             cancels = data.get("cancels")
             if not isinstance(cancels, list):
@@ -138,7 +138,7 @@ class TossPaymentProcessor(PaymentProcessor):
             ]
             if not completed:
                 raise self._invalid_response()
-            cancelled_at = max(
+            canceled_at = max(
                 self._parse_time(item.get("canceledAt")) for item in completed
             )
         return PaymentSnapshot(
@@ -147,7 +147,7 @@ class TossPaymentProcessor(PaymentProcessor):
             data["totalAmount"],
             status,
             paid_at,
-            cancelled_at,
+            canceled_at,
             self._payment_log(data),
             method,
             self._secret_hash(data),
@@ -208,10 +208,10 @@ class TossPaymentProcessor(PaymentProcessor):
         ]
         if not completed:
             raise self._invalid_response()
-        cancelled_at = max(
+        canceled_at = max(
             self._parse_time(item.get("canceledAt")) for item in completed
         )
-        return PaymentCancellationResult(cancelled_at, self._payment_log(data))
+        return PaymentCancellationResult(canceled_at, self._payment_log(data))
 
     # POST 작업도 공통 요청 메서드를 통하게 해 인증·멱등키·오류 변환 규칙을 일관되게 적용한다.
     async def _post(self, path: str, body: dict[str, object]) -> dict[str, object]:

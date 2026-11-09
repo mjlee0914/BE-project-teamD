@@ -148,7 +148,7 @@ class DepositWebhookTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_terminal_state_cannot_be_reopened(self):
         self.saved.status = PaymentStatus.CANCELED
-        self.saved.cancelled_at = datetime.now(UTC)
+        self.saved.canceled_at = datetime.now(UTC)
         with self.assertRaises(PaymentStatusException):
             await self.process()
         self.repo.save.assert_not_awaited()

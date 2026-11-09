@@ -56,7 +56,7 @@ class PaymentResponse(BaseModel):
     amount: int
     method: str | None
     paid_at: datetime | None
-    cancelled_at: datetime | None
+    canceled_at: datetime | None
     created_at: datetime
     updated_at: datetime | None
 
@@ -72,7 +72,7 @@ class PaymentResponse(BaseModel):
             amount=payment.amount,
             method=payment.method,
             paid_at=payment.paid_at,
-            cancelled_at=payment.cancelled_at,
+            canceled_at=payment.canceled_at,
             created_at=payment.created_at,
             updated_at=payment.updated_at,
         )

@@ -118,7 +118,7 @@ class TossPaymentProcessorTests(unittest.IsolatedAsyncioTestCase):
         self.cancellation_response()
         snapshot = await self.processor.retrieve("test-payment-key")
         self.assertEqual(snapshot.status, PaymentStatus.CANCELED)
-        self.assertEqual(snapshot.cancelled_at.hour, 13)
+        self.assertEqual(snapshot.canceled_at.hour, 13)
 
     async def test_mismatched_payment_identity_and_amount_are_rejected(self):
         for field, value in (
@@ -211,7 +211,7 @@ class TossPaymentProcessorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body["cancelReason"], "Customer request")
         self.assertEqual(body["refundReceiveAccount"]["accountNumber"], "1234567890")
         self.assertNotIn("cancelAmount", body)
-        self.assertEqual(result.cancelled_at.hour, 13)
+        self.assertEqual(result.canceled_at.hour, 13)
         self.assertNotIn("cancelReason", result.log.value["cancels"][0])
         self.assertNotIn("1234567890", json.dumps(result.log.value))
 
