@@ -42,11 +42,16 @@ from festivals.domain.repository import FestivalRepository
 
 # 공연 도메인 : 회차 조회·잔여 수량 저장, 회차가 없을 때 예외
 from performances.domain.exceptions import PerformanceNotFound
+from performances.domain.performance import Performance
 from performances.domain.repository import PerformanceRepository
 
 # 예매 도메인 : 저장소 추상 클래스, 엔티티, Enum, 예외, 한도 검사 규칙
-from reservations.domain.enums import DiscountType, TicketType
-from reservations.domain.exceptions import ReservationNotAvailable
+from reservations.domain.enums import DiscountType, ReservationStatus, TicketType
+from reservations.domain.exceptions import (
+    CancelDeadlineViolation,
+    ReservationNotAvailable,
+    ReservationNotFound,
+)
 from reservations.domain.repository import ReservationRepository
 from reservations.domain.reservation import Reservation
 from reservations.domain.service import check_daily_limit
@@ -84,6 +89,39 @@ class ReservationService:
         )
         self._festival_repo = festival_repo  # 축제 : 존재 여부, 상태, 이름·장소(스냅샷)
         self._performance_repo = performance_repo  # 공연 : 회차 목록, 가격, 잔여 수량
+
+    async def _find_target_performance(
+        self, festival_id: int, ticket_type: TicketType
+    ) -> list[Performance]:
+        # ③ 회차 조회
+        # - 예매는 축제(festival_id)를 가리키고, 어느 회차인지는 티켓 종류로 정해진다
+        #   (양일권은 예매 1건이 토·일 두 회차를 포함하기 때문, #79)
+        # - 그래서 축제의 회차를 전부 가져온 뒤 요일로 골라낸다
+        # - 공연 저장소(#93)에는 페이지네이션이 있는 목록 조회(find_all_by_festival)만 있음
+        #   → 축제의 회차 개수를 먼저 세고(count_by_festival), 그 개수만큼 한 번에 가져온다
+        #     (offset=0 : 처음부터, limit=회차 개수 : 전부)
+        performance_count = await self._performance_repo.count_by_festival(festival_id)
+        performances = await self._performance_repo.find_all_by_festival(
+            festival_id, offset=0, limit=performance_count
+        )
+
+        # 티켓 종류에 필요한 요일 목록 ex) SAT → [5], BOTH → [5, 6]
+        performance_day = WEEKDAY[ticket_type]
+        select_performance = []  # 고른 회차를 담을 리스트
+
+        # 회차를 하나씩 꺼내서, 시작 시각의 "한국 요일"이 필요한 요일 목록에 있으면 담는다
+        # - performances는 회차 여러 개의 리스트라 starts_at이 없음 → 하나씩 꺼내서 확인
+        for performance in performances:
+            day = performance.starts_at.astimezone(KST).weekday()
+            if day in performance_day:
+                select_performance.append(performance)
+
+        # 필요한 요일 수와 고른 회차 수가 다르면 예매할 수 없음 → 404
+        # ex) 양일권인데 일요일 회차가 없음 (필요 2개, 고름 1개)
+        # - 하루에 회차가 1개라는 가정 (하루에 여러 회차면 정책을 다시 정해야 함)
+        if len(performance_day) != len(select_performance):
+            raise PerformanceNotFound()
+        return select_performance
 
     # 예매 생성
     # - 인자는 사용자가 선택한 값 (라우터가 요청 body와 로그인 정보에서 꺼내 넘겨줌)
@@ -126,34 +164,9 @@ class ReservationService:
         ):
             raise ReservationNotAvailable()
 
-        # ③ 회차 조회
-        # - 예매는 축제(festival_id)를 가리키고, 어느 회차인지는 티켓 종류로 정해진다
-        #   (양일권은 예매 1건이 토·일 두 회차를 포함하기 때문, #79)
-        # - 그래서 축제의 회차를 전부 가져온 뒤 요일로 골라낸다
-        # - 공연 저장소(#93)에는 페이지네이션이 있는 목록 조회(find_all_by_festival)만 있음
-        #   → 축제의 회차 개수를 먼저 세고(count_by_festival), 그 개수만큼 한 번에 가져온다
-        #     (offset=0 : 처음부터, limit=회차 개수 : 전부)
-        performance_count = await self._performance_repo.count_by_festival(festival_id)
-        performances = await self._performance_repo.find_all_by_festival(
-            festival_id, offset=0, limit=performance_count
+        select_performance = await self._find_target_performance(
+            festival_id, ticket_type
         )
-
-        # 티켓 종류에 필요한 요일 목록 ex) SAT → [5], BOTH → [5, 6]
-        performance_day = WEEKDAY[ticket_type]
-        select_performance = []  # 고른 회차를 담을 리스트
-
-        # 회차를 하나씩 꺼내서, 시작 시각의 "한국 요일"이 필요한 요일 목록에 있으면 담는다
-        # - performances는 회차 여러 개의 리스트라 starts_at이 없음 → 하나씩 꺼내서 확인
-        for performance in performances:
-            day = performance.starts_at.astimezone(KST).weekday()
-            if day in performance_day:
-                select_performance.append(performance)
-
-        # 필요한 요일 수와 고른 회차 수가 다르면 예매할 수 없음 → 404
-        # ex) 양일권인데 일요일 회차가 없음 (필요 2개, 고름 1개)
-        # - 하루에 회차가 1개라는 가정 (하루에 여러 회차면 정책을 다시 정해야 함)
-        if len(performance_day) != len(select_performance):
-            raise PerformanceNotFound()
 
         # ④ 회차 예매 가능 여부 확인
         # - is_bookable(now) : 상태가 OPEN이고, 잔여 수량이 1 이상이고, 지금이 예매 기간 안이면 True
@@ -214,3 +227,84 @@ class ReservationService:
         # 저장 후 반환
         # - create() 결과에는 아직 id가 없음 → DB가 id를 만들어 준 save() 결과를 반환해야 함
         return await self._reservation_repo.save(reservation)
+
+    # --- 조회 유스케이스 ---
+    # 로그인한 사용자의 예매 단건 가져오기
+    # - 라우터의 GET /{reservation_id}와 취소 유스케이스에서 함께 사용
+    #   → "있는 예매인지 + 내 예매인지" 확인을 한 곳에서만 하기 위해 재사용
+    async def get_my_reservation(
+        self, reservation_id: int, user_id: int
+    ) -> Reservation:
+        # ① 예매 조회 : 저장소는 없으면 None을 돌려줌 (예외를 던지지 않음)
+        user_reservation = await self._reservation_repo.find_by_id(reservation_id)
+
+        # ② 없는 예매 → 404
+        if user_reservation is None:
+            raise ReservationNotFound()
+
+        # ③ 남의 예매 → 403이 아니라 똑같이 404
+        # - 403(권한 없음)으로 응답하면 "그 번호의 예매가 존재한다"는 사실이 드러남
+        #   → 남의 예매 번호를 하나씩 넣어 보며 존재 여부를 알아내는 걸 막기 위해 404로 통일
+        if user_reservation.user_id != user_id:
+            raise ReservationNotFound()
+
+        return user_reservation
+
+    # 로그인한 사용자의 전체 예매 가져오기
+    # - 예매가 하나도 없으면 저장소가 빈 리스트 []를 돌려줌 → 예외 없이 그대로 반환
+    #   → 라우터에서 200 + 빈 리스트로 응답 (목록 자원은 있고 항목이 0개일 뿐이므로 404 아님)
+    # - 상태(PENDING/CONFIRMED/CANCELED/EXPIRED)와 상관없이 전부 반환
+    async def get_my_reservations(self, user_id: int) -> list[Reservation]:
+        user_reservations = await self._reservation_repo.find_by_user_id(user_id)
+
+        return user_reservations
+
+    # --- 취소 유스케이스 ---
+    # 예매 취소 흐름
+    # ① 예매 조회        → 없거나 남의 예매면 404 (get_my_reservation 재사용)
+    # ② 회차 조회        → 예매 생성 때와 같은 기준으로 티켓 종류에 맞는 회차를 다시 고름
+    # ③ 취소 마감 확인   → 입금 완료(CONFIRMED) 예매만 검사, 지났으면 409
+    # ④ 예매 상태 변경   → cancel() : CANCELED로 바꾸고 canceled_at 기록 (이미 끝난 예매면 409)
+    # ⑤ 잔여 수량 복구   → 회차마다 quantity만큼 되돌리고 저장
+    # ⑥ 예매 저장·반환
+    # - 중간에 예외가 나면 요청 세션이 rollback 되므로 ⑤의 복구도 함께 취소됨
+    async def cancel_reservation(
+        self, reservation_id: int, user_id: int
+    ) -> Reservation:
+        # ① 예매 조회 (본인 확인 포함)
+        selected_reservation = await self.get_my_reservation(reservation_id, user_id)
+
+        # ② 회차 조회
+        # - 예매에는 회차 id가 없고 festival_id + ticket_type만 있음 (#79)
+        #   → 생성 때와 같은 공통 메서드로 회차를 다시 찾는다 (양일권이면 토·일 2개)
+        selected_performance = await self._find_target_performance(
+            selected_reservation.festival_id, selected_reservation.ticket_type
+        )
+
+        # 현재 시각 (UTC) : 취소 마감 시각과 "시각끼리" 비교하므로 KST로 바꿀 필요 없음
+        now = datetime.now(UTC)
+
+        # ③ 취소 마감 확인
+        # - PENDING(입금 전) 예매는 돈이 오가지 않았으므로 마감과 상관없이 취소 가능
+        # - CONFIRMED(입금 완료) 예매만 회차의 cancel_deadline_at 이전에 취소 가능
+        # - 양일권이면 토·일 중 하나라도 마감이 지나면 취소 불가 (부분 취소 없음)
+        if selected_reservation.status == ReservationStatus.CONFIRMED:
+            for performance in selected_performance:
+                if now > performance.cancel_deadline_at:
+                    raise CancelDeadlineViolation()
+
+        # ④ 예매 상태 변경
+        # - 상태 변경 규칙은 엔티티가 판단 (CANCELED·EXPIRED 예매를 다시 취소하면 엔티티가 409)
+        selected_reservation.cancel()
+
+        # ⑤ 잔여 수량 복구
+        # - 예매 생성 때 decrease_remaining으로 줄였던 수량을 그대로 되돌림
+        # - SOLD_OUT이던 회차는 복구 후 OPEN으로 바뀜 (공연 엔티티가 처리)
+        # - 회차가 취소·종료 상태면 공연 엔티티가 409를 던짐 → 끝난 공연의 예매는 취소 불가
+        # - 엔티티 값만 바꾸면 DB에 반영되지 않으므로 공연 저장소로 저장까지 해야 함
+        for performance in selected_performance:
+            performance.increase_remaining(selected_reservation.quantity)
+            await self._performance_repo.save(performance)
+
+        # ⑥ 예매 저장 후 반환 : 저장 결과(canceled_at 등이 반영된 예매)를 라우터에 돌려줌
+        return await self._reservation_repo.save(selected_reservation)

@@ -43,7 +43,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         if exc.status_code >= 500:
             logger.error("비즈니스 서버 오류 [%s]: %s", exc.error_code, exc.message)
         else:
-            logger.warning(
+            logger.exception(
                 "클라이언트 요청 예외 [%s] %s (path: %s, method: %s)",
                 exc.error_code,
                 exc.message,
