@@ -4,28 +4,24 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from reservations.domain.repository import ReservationRepository
-from reservations.domain.enums import ReservationStatus, TicketType
-from reservations.domain.exceptions import ReservationNotFound
-from performances.domain.repository import PerformanceRepository
 from performances.domain.exceptions import PerformanceNotFound
-from performances.domain.performance import KST, Performance
-from tickets.domain.ticket import TicketStatus
+from performances.domain.performance import Performance
+from performances.domain.repository import PerformanceRepository
+from reservations.domain.enums import ReservationStatus
+from reservations.domain.exceptions import ReservationNotFound
+from reservations.domain.repository import ReservationRepository
+from shared.core.enums import TicketType
+from shared.core.time import KST
 from tickets.domain.exceptions import (
-    TicketNotFound,
     TicketAlreadyIssued,
+    TicketNotFound,
     TicketNotIssuable,
 )
 from tickets.domain.repository import TicketRepository  # 설계도 가져오기
-from tickets.domain.ticket import Ticket  # 반환타입
-
-# 티켓 종류별로 필요한 회차의 요일 (월=0 … 토=5, 일=6)
-# 양일권(BOTH)은 토·일 두 회차를 포함하므로 티켓이 회차 수 × 수량만큼 생긴다
-WEEKDAY = {
-    TicketType.SAT: [5],
-    TicketType.SUN: [6],
-    TicketType.BOTH: [5, 6],
-}
+from tickets.domain.ticket import (
+    Ticket,  # 반환타입
+    TicketStatus,
+)
 
 
 # 티켓과 관련된 업무를 모아두는 상자
@@ -145,7 +141,7 @@ class TicketService:
         performances = await self._performance_repo.find_all_by_festival(
             festival_id, offset=0, limit=count
         )
-        weekdays = WEEKDAY[ticket_type]
+        weekdays = ticket_type.weekdays
         selected = [
             performance
             for performance in performances
