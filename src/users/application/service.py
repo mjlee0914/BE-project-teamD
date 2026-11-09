@@ -79,7 +79,7 @@ class UserService:
     ) -> User:
         # [1] 회원 조회: 없으면 404
         user = await self._get_user(user_id)
-        # [2] 도메인 규칙 실행: 탈퇴 회원 409, 형식 검증 422, 둘 다 들어온 경우만 반영 (규칙 18~21)
+        # [2] 도메인 규칙 실행: 탈퇴 회원 403, 형식 검증 422, 둘 다 들어온 경우만 반영 (규칙 18~21)
         user.update_profile(name=name, phone=phone)
         # [3] 전화번호 중복 확인 → 409 (규칙 9)
         # 정규화된 값(user.phone)으로 조회, 자기 자신의 번호 그대로면 중복이 아님

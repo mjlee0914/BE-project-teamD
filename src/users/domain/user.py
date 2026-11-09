@@ -230,9 +230,9 @@ class User:
     # email, role은 매개변수 자체가 없음 -> 수정 방법 없음 (규칙 18)
     # updated_at은 직접 넣지 않음 -> DB의 onupdate=func.now()가 저장 시 기록
     def update_profile(self, name: str | None = None, phone: str | None = None) -> None:
-        # [1] 탈퇴 회원일 경우 : 수정 불가 -> 409 (규칙 21)
+        # [1] 탈퇴 회원일 경우 : 수정 불가 -> 403 (규칙 21)
         if self.status == UserStatus.WITHDRAWN:
-            raise InvalidUserStatus(
+            raise InactiveUser(
                 f"탈퇴한 회원은 정보를 수정할 수 없습니다. [현재 상태: {self.status}]"
             )
         # [2] 이름 / 전화번호 : 둘 다 들어온 경우만 정규화 -> 검증 -> 반영 (규칙 19, 20)
