@@ -23,7 +23,7 @@ from payments.presentation.schemas import (
 )
 from shared.core.schemas import APIResponse
 
-router = APIRouter(prefix="/v1/payments", tags=["payments"])
+router = APIRouter(prefix="/v1", tags=["payments"])
 CurrentUser = Annotated[TokenPayload, Depends(provide_current_user)]
 Service = Annotated[PaymentService, Depends(provide_payment_service)]
 AccessChecker = Annotated[PaymentAccessChecker, Depends(provide_payment_access_checker)]
@@ -58,7 +58,7 @@ def _processing_error(exc: PaymentProcessingError) -> JSONResponse:
 
 
 # 목록 조회도 예매 소유권을 먼저 확인한다. 공개 응답 스키마로 바꿔 반환한다.
-@router.get("", response_model=APIResponse[list[PaymentResponse]])
+@router.get("/payments", response_model=APIResponse[list[PaymentResponse]])
 async def list_payments(
     reservation_id: Annotated[int, Query(gt=0)],
     user: CurrentUser,
@@ -73,13 +73,15 @@ async def list_payments(
 
 
 # 공유 의존성에서 인증·소유권을 통과한 결제만 응답한다.
-@router.get("/{payment_id}", response_model=APIResponse[PaymentResponse])
+@router.get("/payments/{payment_id}", response_model=APIResponse[PaymentResponse])
 async def get_payment(payment: OwnedPayment):
     return APIResponse.ok(data=PaymentResponse.from_domain(payment))
 
 
 # 승인 입력을 서비스에 넘긴다. 예상한 결제사 오류는 진행 상태를 보존할 수 있도록 502 응답 객체로 반환한다.
-@router.post("/{payment_id}/approve", response_model=APIResponse[PaymentResponse])
+@router.post(
+    "/payments/{payment_id}/approve", response_model=APIResponse[PaymentResponse]
+)
 async def approve_payment(
     request: ApprovalRequest, payment: OwnedPayment, service: Service
 ):
@@ -93,7 +95,9 @@ async def approve_payment(
 
 
 # 요청의 환불 계좌를 도메인 값으로 바꿔 취소를 요청하고, 결과를 공개 응답 스키마로 반환한다.
-@router.post("/{payment_id}/cancel", response_model=APIResponse[PaymentResponse])
+@router.post(
+    "/payments/{payment_id}/cancel", response_model=APIResponse[PaymentResponse]
+)
 async def cancel_payment(
     request: CancellationRequest, payment: OwnedPayment, service: Service
 ):
@@ -110,7 +114,9 @@ async def cancel_payment(
 
 
 # 소유권 확인 후 결제사 최신 결과를 재조회한다. 통신 실패는 승인·취소와 같은 502 형식으로 전달한다.
-@router.post("/{payment_id}/reconcile", response_model=APIResponse[PaymentResponse])
+@router.post(
+    "/payments/{payment_id}/reconcile", response_model=APIResponse[PaymentResponse]
+)
 async def reconcile_payment(
     request: ReconciliationRequest, payment: OwnedPayment, service: Service
 ):

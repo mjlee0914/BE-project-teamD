@@ -106,6 +106,17 @@ class UserService:
         # [3] 저장: 새 해시만 바뀜
         await self._user_repo.save(user)
 
+    # [관리자 검증]
+    # 다른 도메인(축제, 공연 등)의 관리자 전용 API에서 사용
+    # 토큰(TokenPayload)에는 user_id만 있어서 role은 DB에서 회원을 조회해 확인
+    async def verify_admin(self, user_id: int) -> User:
+        # [1] 회원 조회: 없으면 404
+        user = await self._get_user(user_id)
+        # [2] 도메인 규칙 실행: 탈퇴, ADMIN 아님은 403 (규칙 25, 26)
+        user.ensure_admin()
+        # [3] 검증된 관리자 반환 (호출한 쪽에서 id 등을 바로 사용 가능)
+        return user
+
     # [회원 탈퇴]
     # target_user_id: 탈퇴 '대상', requester_id: 탈퇴를 '요청한 사람' (토큰의 user_id)
     async def withdraw(self, target_user_id: int, requester_id: int) -> None:
