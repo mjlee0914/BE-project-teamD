@@ -42,6 +42,21 @@ from tickets.domain.exceptions import (
 # 공연당일 판단기준 시간대(한국시간)
 KST = timezone(timedelta(hours=9))
 
+# 끝난 상태: 더 이상 상태를 바꿀 수 없다
+FINAL_STATUSES = (
+    TicketStatus.CANCELED,
+    TicketStatus.USED,
+    TicketStatus.EXPIRED,
+)
+
+
+# now는 DB 시각(DateTime(timezone=True))과 비교하므로 시간대가 있어야 한다
+def _require_aware(now: datetime) -> None:
+    if now.tzinfo is None:
+        raise ValueError(
+            "now는 시간대가 있는 값이어야 합니다. datetime.now(UTC)를 사용하세요."
+        )
+
 
 # 티켓양식
 @dataclass
@@ -68,6 +83,8 @@ class Ticket:
     created_at: datetime | None = None
     updated_at: datetime | None = None
     ticket_code: UUID = field(default_factory=uuid4)
+    # 낙관적 락 번호표. 저장 전에는 None, 저장소가 채운다
+    version: int | None = None
 
     # 잘못된 티켓이 발행되지 않게 검증
     # self의 price, 공연 시각을 읽어야 해서 staticmethod가 아닌 인스턴스 메서드로 작성
@@ -79,15 +96,9 @@ class Ticket:
                 "공연 종료 시각은 시작 시각보다 뒤여야 합니다"
             )
 
-    # 끝난 상태: 더 이상 상태 변경 없음
-    _FINAL_STATUSES = (
-        TicketStatus.CANCELED,
-        TicketStatus.USED,
-        TicketStatus.EXPIRED,
-    )
-
     # 결제 확인 후 티켓 발급 pending -> issued
     def confirm(self, now: datetime) -> None:  # 값을 돌려주지 않고 자기 자신을 바꿈
+        _require_aware(now)
         if self.status != TicketStatus.PENDING:
             raise InvalidTicketStatus("결제 대기 상태의 티켓만 발급할 수 있습니다.")
         self.status = TicketStatus.ISSUED  # 객체 안 값이 직접 수정됨.
@@ -95,15 +106,17 @@ class Ticket:
 
     # 취소 pending/issued -> canceled
     def cancel(self, now: datetime) -> None:
-        if self.status in self._FINAL_STATUSES:
+        _require_aware(now)
+        if self.status in FINAL_STATUSES:
             raise TicketNotCancelable("이미 처리가 끝난 티켓은 취소할 수 없습니다.")
         if now > self.cancel_deadline_at:
             raise TicketNotCancelable("취소 가능한 기간이 지났습니다.")
         self.status = TicketStatus.CANCELED
         self.canceled_at = now
 
-    # 입장 issued -> entered
+    # 입장 issued -> used
     def enter(self, now: datetime) -> None:
+        _require_aware(now)
         if self.status != TicketStatus.ISSUED:
             raise TicketNotEnterable("발급된 티켓만 입장할 수 있습니다.")
         if (
@@ -118,6 +131,7 @@ class Ticket:
 
     # 만료 issued -> expired
     def expire(self, now: datetime) -> None:
+        _require_aware(now)
         if self.status != TicketStatus.ISSUED:
             raise InvalidTicketStatus("발급된 티켓만 만료 처리할 수 있습니다.")
         if now < self.performance_end_at:

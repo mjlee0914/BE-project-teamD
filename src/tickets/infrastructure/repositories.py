@@ -3,6 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession  # DB대화창구
+from sqlalchemy.orm.exc import StaleDataError
 
 from reservations.infrastructure.models import (
     Reservation as ReservationModel,  # 에매의 도메인 객체와 겹칠 수 있어서 별칭 설정
@@ -10,7 +11,7 @@ from reservations.infrastructure.models import (
 from tickets.domain.enums import (
     TicketStatus,  # 변환 함수 _to_domain에서 이 enum으로 감쌈 (_to_model에서는 .value로 반대 방향 변환.)
 )
-from tickets.domain.exceptions import TicketNotFound
+from tickets.domain.exceptions import TicketNotFound, TicketVersionConflict
 from tickets.domain.repository import TicketRepository  # 상속할 설계도
 from tickets.domain.ticket import Ticket  # 반환 타입이자 반환 결과로 만드는 객체 자체
 from tickets.infrastructure.models import Ticket as TicketModel
@@ -37,6 +38,7 @@ def _to_domain(
         canceled_at=model.canceled_at,
         created_at=model.created_at,
         updated_at=model.updated_at,
+        version=model.version,
     )
 
 
@@ -88,13 +90,24 @@ class SqlAlchemyTicketRepository(
             model = await self._session.get(TicketModel, ticket.id)
             if model is None:
                 raise TicketNotFound()
+
+            # session.get()은 DB에서 최신 값을 다시 읽어 오므로, 서비스가 조회했던 때의
+            # version(ticket.version)과 비교해야 그 사이 다른 요청이 바꾼 것을 잡을 수 있다
+            if model.version != ticket.version:
+                raise TicketVersionConflict()
+
             # 바뀔 수 있는 값만 옮겨 적는다 (공연 스냅샷, 가격, ticket_code는 불변)
             model.status = ticket.status.value
             model.issued_at = ticket.issued_at
             model.used_at = ticket.used_at
             model.canceled_at = ticket.canceled_at
 
-        await self._session.flush()  # INSERT / UPDATE를 DB로 보냄 (commit은 get_db가)
+        try:
+            await (
+                self._session.flush()
+            )  # INSERT / UPDATE를 DB로 보냄 (commit은 get_db가)
+        except StaleDataError:  # flush 순간에 version이 어긋난 경우 (SQLAlchemy 에러)
+            raise TicketVersionConflict() from None
         await self._session.refresh(model)  # DB가 채운 id, created_at 반영
         return _to_domain(model)
 

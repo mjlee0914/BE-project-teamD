@@ -46,3 +46,11 @@ class TicketNotCancelable(ConflictException):
 class TicketNotEnterable(ConflictException):
     def __init__(self, message: str = "입장할 수 없는 티켓입니다."):
         super().__init__(message=message, error_code="TICKET_NOT_ENTERABLE")
+
+
+# 낙관적 락: 조회한 뒤 저장하기 전에 다른 요청이 먼저 티켓을 변경함 (version 불일치)
+class TicketVersionConflict(ConflictException):
+    def __init__(
+        self, message: str = "다른 요청이 먼저 티켓을 변경했습니다. 다시 시도해 주세요."
+    ):
+        super().__init__(message=message, error_code="TICKET_VERSION_CONFLICT")
