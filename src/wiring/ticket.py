@@ -1,6 +1,10 @@
+from typing import Annotated
+
 from fastapi import Depends, FastAPI
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from performances.infrastructure.repositories import SqlAlchemyPerformanceRepository
+from reservations.infrastructure.repositories import SqlalchemyReservationRepository
 from shared.core.database import get_db
 from tickets.application.service import TicketService
 from tickets.infrastructure.repositories import SqlAlchemyTicketRepository
@@ -8,10 +12,12 @@ from tickets.presentation.dependencies import get_ticket_service
 
 
 def build_ticket_service(
-    session: AsyncSession = Depends(get_db),
+    session: Annotated[AsyncSession, Depends(get_db)],
 ) -> TicketService:  # get_db가 요청마다 세션을 넣어줌.
     return TicketService(
-        SqlAlchemyTicketRepository(session)
+        SqlAlchemyTicketRepository(session),
+        reservation_repo=SqlalchemyReservationRepository(session),
+        performance_repo=SqlAlchemyPerformanceRepository(session),
     )  # 세션 넣어서 저장소 완성, 그리고 그 저장소를 넣어 서비스 완성
 
 
