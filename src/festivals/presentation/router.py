@@ -1,7 +1,6 @@
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query
 
@@ -15,7 +14,7 @@ from festivals.presentation.schemas import (
 )
 from shared.core.schemas import APIResponse, PageResponse
 
-KST = ZoneInfo("Asia/Seoul")
+KST = timezone(timedelta(hours=9))
 
 
 router = APIRouter(prefix="/v1/festivals", tags=["festivals"])

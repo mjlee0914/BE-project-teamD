@@ -13,6 +13,8 @@ from festivals.domain.exceptions import (
 from festivals.domain.festival import Festival
 from festivals.domain.repository import FestivalRepository
 from performances.domain.enums import PerformanceStatus
+
+# TODO: KST 상수 통일 회의 후 shared로 교체 (#110 리뷰)
 from performances.domain.performance import KST
 from performances.domain.repository import PerformanceRepository
 
