@@ -9,12 +9,12 @@ from auth.presentation.dependencies import provide_auth_service, require_bearer_
 from auth.presentation.schemas import LoginRequest, TokenResponse
 from shared.core.schemas import APIResponse
 
-router = APIRouter(prefix="/v1/auth", tags=["auth"])
+router = APIRouter(prefix="/v1", tags=["auth"])
 Service = Annotated[AuthService, Depends(provide_auth_service)]
 
 
 # 검증된 이메일·원문 비밀번호를 서비스에 전달하고, 발급된 토큰은 캐시 방지 헤더와 함께 응답한다.
-@router.post("/login", response_model=APIResponse[TokenResponse])
+@router.post("/auth/login", response_model=APIResponse[TokenResponse])
 async def login(request: LoginRequest, response: Response, service: Service):
     # SecretStr의 원문은 비밀번호 확인에 필요한 이 지점에서 꺼낸다. 로그로 출력하지 않는다.
     token, token_type, expires_in = await service.login(
@@ -31,7 +31,7 @@ async def login(request: LoginRequest, response: Response, service: Service):
 
 
 # 헤더의 토큰을 차단 목록에 등록한다. 성공은 내용 없는 204이며 활성 회원 검사와는 별도로 처리한다.
-@router.post("/logout", status_code=204)
+@router.post("/auth/logout", status_code=204)
 async def logout(
     token: Annotated[str, Depends(require_bearer_token)], service: Service
 ) -> Response:
