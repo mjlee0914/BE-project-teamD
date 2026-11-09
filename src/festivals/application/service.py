@@ -6,7 +6,6 @@
 from datetime import date, datetime, time, timedelta
 
 from festivals.domain.exceptions import (
-    FestivalAlreadyCanceled,
     FestivalHasPerformanceOutsidePeriod,
     FestivalHasUncanceledPerformances,
     FestivalNotFound,
@@ -145,8 +144,7 @@ class FestivalService:
         festival = await self.get_festival(festival_id)
 
         # 이미 취소된 축제를 또 취소하면 에러
-        if festival.canceled_at is not None:
-            raise FestivalAlreadyCanceled()
+        festival.ensure_not_canceled()
         
         # 공연상태가 CANCELED가 아닌 공연이 존재하면 축제 취소 x
         if await self._performance_repo.exists_uncanceled_by_festival(festival_id):
