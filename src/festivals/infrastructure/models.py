@@ -1,7 +1,10 @@
 from datetime import date, datetime
-from sqlalchemy import  CheckConstraint, DateTime, String, BigInteger, Date, Text
+
+from sqlalchemy import BigInteger, CheckConstraint, Date, DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
+
 from shared.core.models import Base, DateTimeMixin
+
 
 class Festival(DateTimeMixin, Base):
     __tablename__ = "festivals"

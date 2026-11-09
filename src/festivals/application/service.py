@@ -3,16 +3,16 @@
 # 저장소를 생성자로 받고, 없으면 NotFound raise
 # 요청이 끝날 때 get_db가 commit한다.
 
-from datetime import date
+from datetime import date, datetime, time, timedelta
 
 from festivals.domain.exceptions import (
     FestivalHasPerformanceOutsidePeriod,
+    FestivalHasUncanceledPerformances,
     FestivalNotFound,
     FestivalPeriodOverlap,
 )
 from festivals.domain.festival import Festival
 from festivals.domain.repository import FestivalRepository
-from performances.domain.enums import PerformanceStatus
 from performances.domain.repository import PerformanceRepository
 from shared.core.time import KST, now_utc
 
@@ -74,7 +74,7 @@ class FestivalService:
         total = await self._festival_repo.count() # 전체 개수 계산 -> ex) 전체 total개 중 1 페이지
         return festivals, total
 
-    # 수정: 꺼내기 -> 고치기 -> 겹침 검사 -> 저장
+    # 수정: 꺼내기 -> 고치기 -> 겹침 검사 -> (기간 변경시) 기간 밖 공연 검사 -> 저장
     async def update_festival(
             self,
             festival_id: int,
@@ -87,11 +87,11 @@ class FestivalService:
         # 엔티티 꺼내기
         festival = await self.get_festival(festival_id)
 
-        # 고치기 (엔티티에게 시킨다)
+        # 고치기(새로운 정보 적기) (엔티티에게 시킨다)
         festival.change_info(name=name, venue=venue, description=description)
         festival.change_period(starts_on=starts_on, ends_on=ends_on)
 
-        # 겹침 검사
+        # 겹침 검사 (현재는 이름이나 설명만 바꿔도 검사를 한다. 중대 이슈는 아님.)
         if await self._festival_repo.exists_overlapping(
             festival.venue,
             festival.starts_on,
@@ -100,20 +100,39 @@ class FestivalService:
         ):
             raise FestivalPeriodOverlap()
 
-        # 줄어든 기간 밖에 공연이 있는지 검사
-        # count로 공연 개수 세기
-        count = await self._performance_repo.count_by_festival(festival_id)
-        # 축제별 공연 가져오기
-        performances = await self._performance_repo.find_all_by_festival(festival_id=festival_id, offset=0, limit=count)
-        for p in performances:
-            if p.status == PerformanceStatus.CANCELED:
-                continue
-            start_day = p.starts_at.astimezone(KST).date()
-            end_day = p.ends_at.astimezone(KST).date()
-            if not (festival.starts_on <= start_day and end_day <= festival.ends_on):
+        # 기간(starts_on, ends_on)이 요청에 들어올 때만 줄어든 기간 밖에 공연이 있는지 검사
+        # refactor 작업: 축제별 공연 개수를 전부 "세서" 전부 "가져오기" 에서 -> exists_outside_period 한번으로 바꾸기
+        # 장점:
+        # 1. DB왕복 2번에서 1번으로 줄임.
+        # 2. 옮기는 데이터도 공연 전체에서 boolean 값 하나로 바뀜
+        # 3. EXISTS는 조건에 맞는 공연을 찾으면 바로 멈춤
+        # --> 공연이 많아져도 찾는 비용이 그대로 + 코드가 짧아짐 + 다른 검사들과 같은 패턴(exists_duplicated_title, exists_uncanceled_by_festival)
+        if starts_on is not None or ends_on is not None:
+            # 축제 첫날 00:00 KST
+            # combine(날짜, 시각, tzinfo) = 날짜 + 시각 + 시간대 합쳐 datetime 하나로 만듦.
+            # 날짜에는 요청값이 아닌 엔티티 값을 씀: 변경이 반영된 시작일
+            period_start = datetime.combine(festival.starts_on, time.min, tzinfo=KST)
+
+            # 축제 마지막 날(다음 날) 00:00 KST
+            # timedelta(days=1)= 하루, 날짜 + 하루 = 다음날
+            # 다음날 자정 = 마지막 날이 끝나는 순간
+            period_end = datetime.combine(festival.ends_on + timedelta(days=1), time.min, tzinfo=KST)
+
+            # 공연 저장소에 "기간 밖의 취소 안된 공연 있는지" 확인
+            # DB 접근 - await 사용
+            # KST가 붙은 시각이라 DB가 UTC 값과 알아서 맞춰서 비교한다.
+            if await self._performance_repo.exists_outside_period(
+                festival_id=festival_id,
+                period_start=period_start,
+                period_end=period_end,
+            ):
+                # True일 때 (밖에 공연이 하나라도 있을 때) -> 409
+                # 여기서 raise하면 save까지 안가고 get_db가 rollback
                 raise FestivalHasPerformanceOutsidePeriod()
 
-        # 저장
+        # 모든 검사를 통과하면 저장
+        # flush, UPDATE
+        # commit은 요청이 끝날 때 get_db가 한다.
         return await self._festival_repo.save(festival)
 
     # 취소: 꺼내기 -> 취소 -> 저장
@@ -124,7 +143,13 @@ class FestivalService:
         # 꺼내기
         festival = await self.get_festival(festival_id)
 
+        # 이미 취소된 축제를 또 취소하면 에러
+        festival.ensure_not_canceled()
+        
+        # 공연상태가 CANCELED가 아닌 공연이 존재하면 축제 취소 x
+        if await self._performance_repo.exists_uncanceled_by_festival(festival_id):
+            raise FestivalHasUncanceledPerformances()
+
         # 지금 시각을 만들어서 엔티티에 넘긴다.
         festival.cancel(now_utc())
-        # TODO: 축제취소 시 소속 공연 처리(팀 결정 필요)
         return await self._festival_repo.save(festival)
