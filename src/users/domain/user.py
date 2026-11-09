@@ -37,7 +37,7 @@
 
 [정보 수정]
 18. 회원 정보 수정은 이름과 전화번호만 가능하다. (email, role 수정 불가)
-19. 값이 들어온 항목만 수정하고, 들어오지 않은(None) 항목은 그대로 둔다.
+19. 이름과 전화번호를 함께 받아야 수정하며, 둘 중 하나라도 없으면(None) 아무것도 바꾸지 않는다.
 20. 수정하는 값도 생성 때와 같은 정규화, 검증을 거친다. (규칙 4, 5, 8)
 21. 탈퇴한(WITHDRAWN) 회원은 정보 수정이 불가하다.
 
@@ -230,12 +230,12 @@ class User:
     # email, role은 매개변수 자체가 없음 -> 수정 방법 없음 (규칙 18)
     # updated_at은 직접 넣지 않음 -> DB의 onupdate=func.now()가 저장 시 기록
     def update_profile(self, name: str | None = None, phone: str | None = None) -> None:
-        # [1] 탈퇴 회원일 경우 : 수정 불가 -> 409 (규칙 21)
+        # [1] 탈퇴 회원일 경우 : 수정 불가 -> 403 (규칙 21)
         if self.status == UserStatus.WITHDRAWN:
-            raise InvalidUserStatus(
+            raise InactiveUser(
                 f"탈퇴한 회원은 정보를 수정할 수 없습니다. [현재 상태: {self.status}]"
             )
-        # [2] 이름 / 전화번호 : 값이 들어온 경우만 정규화 -> 검증 -> 반영 (규칙 19, 20)
+        # [2] 이름 / 전화번호 : 둘 다 들어온 경우만 정규화 -> 검증 -> 반영 (규칙 19, 20)
         # 중복 확인(규칙 9)은 DB 조회가 필요해서 service에서 find_by_phone으로 처리
         # 검증을 통과한 뒤에 self에 넣어야 실패 시 기존 값 유지 가능
         if not None in (name, phone):
