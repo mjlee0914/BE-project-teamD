@@ -48,6 +48,18 @@ class TicketNotEnterable(ConflictException):
         super().__init__(message=message, error_code="TICKET_NOT_ENTERABLE")
 
 
+# 승인되지 않은 예매로 티켓 발급을 시도함
+class TicketNotIssuable(ConflictException):
+    def __init__(self, message: str = "승인된 예매만 티켓을 발급할 수 있습니다."):
+        super().__init__(message=message, error_code="TICKET_NOT_ISSUABLE")
+
+
+# 이미 티켓이 발급된 예매
+class TicketAlreadyIssued(ConflictException):
+    def __init__(self, message: str = "이미 티켓이 발급된 예매입니다."):
+        super().__init__(message=message, error_code="TICKET_ALREADY_ISSUED")
+
+
 # 낙관적 락: 조회한 뒤 저장하기 전에 다른 요청이 먼저 티켓을 변경함 (version 불일치)
 class TicketVersionConflict(ConflictException):
     def __init__(

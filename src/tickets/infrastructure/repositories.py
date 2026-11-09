@@ -156,6 +156,7 @@ class SqlAlchemyTicketRepository(
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
+    # 관리자
     async def find_all(
         self,
         performance_id: int | None,
@@ -176,6 +177,7 @@ class SqlAlchemyTicketRepository(
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars().all()]
 
+    # 관리자 검색 전체 개수 (PageResponse.total 용)
     async def count(
         self, performance_id: int | None, status: TicketStatus | None
     ) -> int:
@@ -187,6 +189,7 @@ class SqlAlchemyTicketRepository(
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
+    # 입장 현황
     async def count_by_status(self, performance_id: int) -> dict[TicketStatus, int]:
         stmt = (
             select(TicketModel.status, func.count())

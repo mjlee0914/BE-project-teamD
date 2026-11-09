@@ -3,10 +3,9 @@
 # 저장소를 생성자로 받고, 없으면 NotFound raise
 # 요청이 끝날 때 get_db가 commit한다.
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 
 from festivals.domain.exceptions import (
-    FestivalAlreadyCanceled,
     FestivalHasPerformanceOutsidePeriod,
     FestivalHasUncanceledPerformances,
     FestivalNotFound,
@@ -14,10 +13,8 @@ from festivals.domain.exceptions import (
 )
 from festivals.domain.festival import Festival
 from festivals.domain.repository import FestivalRepository
-
-# TODO: KST 상수 통일 회의 후 shared로 교체 (#110 리뷰)
-from performances.domain.performance import KST
 from performances.domain.repository import PerformanceRepository
+from shared.core.time import KST, now_utc
 
 
 class FestivalService:
@@ -113,7 +110,7 @@ class FestivalService:
         if starts_on is not None or ends_on is not None:
             # 축제 첫날 00:00 KST
             # combine(날짜, 시각, tzinfo) = 날짜 + 시각 + 시간대 합쳐 datetime 하나로 만듦.
-            # 날짜에는 요청값이 아닌 엔티티 값을 씀: 기존 시작일
+            # 날짜에는 요청값이 아닌 엔티티 값을 씀: 변경이 반영된 시작일
             period_start = datetime.combine(festival.starts_on, time.min, tzinfo=KST)
 
             # 축제 마지막 날(다음 날) 00:00 KST
@@ -147,14 +144,12 @@ class FestivalService:
         festival = await self.get_festival(festival_id)
 
         # 이미 취소된 축제를 또 취소하면 에러
-        if festival.canceled_at is not None:
-            raise FestivalAlreadyCanceled()
+        festival.ensure_not_canceled()
         
         # 공연상태가 CANCELED가 아닌 공연이 존재하면 축제 취소 x
         if await self._performance_repo.exists_uncanceled_by_festival(festival_id):
             raise FestivalHasUncanceledPerformances()
 
         # 지금 시각을 만들어서 엔티티에 넘긴다.
-        festival.cancel(datetime.now(UTC))
-
+        festival.cancel(now_utc())
         return await self._festival_repo.save(festival)

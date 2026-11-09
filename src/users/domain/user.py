@@ -37,7 +37,7 @@
 
 [정보 수정]
 18. 회원 정보 수정은 이름과 전화번호만 가능하다. (email, role 수정 불가)
-19. 값이 들어온 항목만 수정하고, 들어오지 않은(None) 항목은 그대로 둔다.
+19. 이름과 전화번호를 함께 받아야 수정하며, 둘 중 하나라도 없으면(None) 아무것도 바꾸지 않는다.
 20. 수정하는 값도 생성 때와 같은 정규화, 검증을 거친다. (규칙 4, 5, 8)
 21. 탈퇴한(WITHDRAWN) 회원은 정보 수정이 불가하다.
 
@@ -45,6 +45,10 @@
 22. 로그인, 예매는 ACTIVE 회원만 가능하다.
 23. ACTIVE가 아닌(WITHDRAWN) 회원이 이용하려 하면 도메인 오류가 발생한다.
 24. 진행 중인 예매가 있을 경우 탈퇴가 불가하다. (예매 조회가 필요하므로 application(service)에서 확인한다)
+
+[관리자 검증]
+25. 관리자 전용 기능(축제, 공연 등록 등)은 role이 ADMIN인 회원만 사용 가능하다.
+26. 관리자 전용 기능도 ACTIVE 회원만 사용할 수 있다. (탈퇴한 ADMIN은 사용 불가)
 
 [보류]
 - 전화번호 삭제(값을 비우는 수정)
@@ -57,14 +61,15 @@ import re
 # __init__, __repr__, __eq__를 자동으로 만들어 주는 데코레이터
 from dataclasses import dataclass
 
-# 탈퇴 시각 기록용 (UTC 기준)
-from datetime import UTC, datetime
+# 탈퇴 시각 기록용 (UTC 기준, 서비스가 now_utc()로 넘겨줌)
+from datetime import datetime
 
 # enums.py
 from users.domain.enums import UserRole, UserStatus
 
 # exceptions.py
 from users.domain.exceptions import (
+    AdminPermissionDenied,
     InactiveUser,
     InvalidEmail,
     InvalidName,
@@ -207,7 +212,7 @@ class User:
     # [회원 탈퇴(소프트 삭제) 비즈니스 로직]
     # requester: 탈퇴를 '요청한 사람' (self = 탈퇴 '대상')
     # 소프트 삭제 : 실제 DELETE 대신 상태값만 바꿈 → 예매 내역 등 연관 데이터 보존
-    def withdraw(self, requester: "User") -> None:
+    def withdraw(self, requester: "User", now: datetime) -> None:
         # [1] 중복 탈퇴 방지 → 409 (규칙 16)
         if self.status == UserStatus.WITHDRAWN:
             raise InvalidUserStatus(
@@ -216,7 +221,7 @@ class User:
         # [2] 본인 여부: 대상이 DB에 저장된 회원(id 존재)이면서 요청자 id와 같을 때 (규칙 15)
         is_owner = self.id is not None and self.id == requester.id
         # [3] 관리자 여부: 관리자는 다른 회원도 탈퇴 처리 가능
-        is_admin = requester.role == UserRole.ADMIN
+        is_admin = requester.is_admin
         # [4] 권한 검사: 본인, 관리자 둘 다 아니면 403
         if not (is_owner or is_admin):
             raise WithdrawPermissionDenied()
@@ -224,18 +229,18 @@ class User:
         # 행을 지우지 않고 상태, 시간만 기록 (규칙 17)
         self.status = UserStatus.WITHDRAWN
         # [6] 탈퇴 시각 기록: 서버 지역과 무관하게 UTC로 통일
-        self.deleted_at = datetime.now(UTC)
+        self.deleted_at = now
 
     # [회원 정보 수정 비즈니스 로직]
     # email, role은 매개변수 자체가 없음 -> 수정 방법 없음 (규칙 18)
     # updated_at은 직접 넣지 않음 -> DB의 onupdate=func.now()가 저장 시 기록
     def update_profile(self, name: str | None = None, phone: str | None = None) -> None:
-        # [1] 탈퇴 회원일 경우 : 수정 불가 -> 409 (규칙 21)
+        # [1] 탈퇴 회원일 경우 : 수정 불가 -> 403 (규칙 21)
         if self.status == UserStatus.WITHDRAWN:
-            raise InvalidUserStatus(
+            raise InactiveUser(
                 f"탈퇴한 회원은 정보를 수정할 수 없습니다. [현재 상태: {self.status}]"
             )
-        # [2] 이름 / 전화번호 : 값이 들어온 경우만 정규화 -> 검증 -> 반영 (규칙 19, 20)
+        # [2] 이름 / 전화번호 : 둘 다 들어온 경우만 정규화 -> 검증 -> 반영 (규칙 19, 20)
         # 중복 확인(규칙 9)은 DB 조회가 필요해서 service에서 find_by_phone으로 처리
         # 검증을 통과한 뒤에 self에 넣어야 실패 시 기존 값 유지 가능
         if not None in (name, phone):
@@ -253,6 +258,23 @@ class User:
     def is_active(self) -> bool:
         # ACTIVE만 True, WITHDRAWN은 False (규칙 22)
         return self.status == UserStatus.ACTIVE
+
+    # [관리자 여부 확인]
+    @property
+    def is_admin(self) -> bool:
+        # ADMIN만 True, USER는 False (규칙 25)
+        return self.role == UserRole.ADMIN
+
+    # [관리자 검사]
+    # 관리자 전용 기능 시작 전에 한 줄로 사용 -> 통과하면 아무 일도 없음
+    def ensure_admin(self) -> None:
+        # [1] 탈퇴 회원 먼저 차단 -> 403 InactiveUser (규칙 26)
+        self.ensure_active()
+        # [2] ADMIN이 아니면 403 (규칙 25)
+        if not self.is_admin:
+            raise AdminPermissionDenied(
+                f"관리자만 이용할 수 있습니다. [현재 권한 : {self.role}]"
+            )
 
     # [이메일 형식 검증]
     # @staticmethod: self/cls가 필요 없는 순수 검사 함수 → 클래스 안에 두어 응집도 유지

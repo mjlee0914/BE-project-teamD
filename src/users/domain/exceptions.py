@@ -74,7 +74,13 @@ class WithdrawPermissionDenied(ForbiddenException):
         super().__init__(message=message, error_code="WITHDRAW_PERMISSION_DENIED")
 
 
-# ACTIVE가 아닌 회원의 로그인, 예매 요청 (규칙 22, 23)
+# ACTIVE가 아닌 회원의 로그인, 예매, 정보 수정 요청 (규칙 21, 22, 23)
 class InactiveUser(ForbiddenException):
     def __init__(self, message: str = "이용할 수 없는 회원 상태입니다."):
         super().__init__(message=message, error_code="INACTIVE_USER")
+
+
+# 관리자가 아닌 회원의 관리자 전용 기능 요청 (규칙 25)
+class AdminPermissionDenied(ForbiddenException):
+    def __init__(self, message: str = "관리자만 이용할 수 있습니다."):
+        super().__init__(message=message, error_code="ADMIN_PERMISSION_DENIED")
