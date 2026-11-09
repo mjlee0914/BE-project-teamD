@@ -66,11 +66,6 @@ from shared.core.time import KST, now_utc, today_kst
 # - 값을 전부 리스트로 둔 이유
 #   ① "회차 요일 in 목록"으로 검사할 수 있음 (숫자 하나면 in을 쓸 수 없어 TypeError)
 #   ② len(목록)으로 "필요한 회차 수"를 알 수 있음 (양일권 = 2개)
-WEEKDAY = {
-    TicketType.SAT: [5],
-    TicketType.SUN: [6],
-    TicketType.BOTH: [5, 6],
-}
 
 
 class ReservationService:
@@ -106,7 +101,7 @@ class ReservationService:
         )
 
         # 티켓 종류에 필요한 요일 목록 ex) SAT → [5], BOTH → [5, 6]
-        performance_day = WEEKDAY[ticket_type]
+        performance_day = ticket_type.weekdays
         select_performance = []  # 고른 회차를 담을 리스트
 
         # 회차를 하나씩 꺼내서, 시작 시각의 "한국 요일"이 필요한 요일 목록에 있으면 담는다
