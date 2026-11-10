@@ -15,7 +15,7 @@ from payments.presentation.dependencies import (
     provide_payment_access_checker,
     provide_payment_service,
 )
-from payments.presentation.router import router
+from payments.presentation.routers.v1.router import router
 from shared.core.exception_handlers import register_exception_handlers
 from shared.core.exceptions import (
     ForbiddenException,

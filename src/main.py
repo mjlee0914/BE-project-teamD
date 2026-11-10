@@ -9,6 +9,7 @@ FastAPI 앱의 시작점
 3. 의존성 연결 (wiring/)
 4. 도메인별 라우터 등록
 """
+
 # 표준 라이브러리
 import asyncio
 from contextlib import asynccontextmanager, suppress
@@ -16,8 +17,12 @@ from contextlib import asynccontextmanager, suppress
 # 외부 라이브러리
 from fastapi import FastAPI
 
-# 라우터 작성 후 주석 해제
+from auth.presentation.routers.v1.router import router as auth_router
 from festivals.presentation.routers.v1.router import router as festival_router
+from payments.presentation.routers.v1.router import router as payment_router
+from payments.presentation.routers.v1.webhook_router import (
+    router as payment_webhook_router,
+)
 from performances.presentation.routers.v1.router import router as performance_router
 
 # 프로젝트 코드
@@ -29,9 +34,6 @@ from reservations.presentation.routers.v1.router import router as reservation_ro
 from shared.core.exception_handlers import register_exception_handlers
 from tickets.presentation.routers.v1.router import router as ticket_router
 from users.presentation.routers.v1.router import router as user_router
-
-# from auth.presentation.routers.v1.router import router as auth_router
-# from payments.presentation.routers.v1.router import router as payment_router
 from wiring import wire_dependencies
 
 
@@ -66,8 +68,9 @@ app.include_router(user_router)
 app.include_router(performance_router)
 app.include_router(festival_router)
 app.include_router(ticket_router)
-# app.include_router(auth_router)
-# app.include_router(payment_router)
+app.include_router(auth_router)
+app.include_router(payment_router)
+app.include_router(payment_webhook_router)
 
 
 # 서버 동작 확인용 (헬스 체크)

@@ -13,7 +13,7 @@
 
 ## API 목록
 
-`presentation/router.py`에는 다음 API가 준비되어 있다.
+`presentation/routers/v1/router.py`에는 다음 API가 준비되어 있다.
 
 | 메서드 | 경로 | 기능 |
 | --- | --- | --- |
@@ -66,9 +66,9 @@ auth 구현체의 앱 연결 전에는 임의로 토큰을 신뢰하거나 검�
 
 ## 가상계좌 입금 웹훅과 재조회
 
-`presentation/webhook_router.py`는 `POST /v1/payments/webhooks/deposit`를 제공한다.
-아직 앱에 등록하지 않았고 실제 토스 개발자센터에도 URL을 등록하지 않았다.
-별도 라우터이므로 일반 결제 라우터보다 먼저 등록하거나 고정 경로 충돌이 없도록 연결해야 한다.
+`presentation/routers/v1/webhook_router.py`는 `POST /v1/payments/webhooks/deposit`를 제공한다.
+앱에는 등록되어 있다. 실제 입금 알림을 받으려면 토스 개발자센터에도 웹훅 URL을 등록해야 한다.
+별도 라우터로 관리해 일반 결제 경로와 분리했다.
 
 토스 DEPOSIT_CALLBACK 본문은 최상위 orderId, secret, transactionKey, status를 사용한다.
 PAYMENT_STATUS_CHANGED의 data 객체나 일반 사용자 JWT로 대신 검증하지 않는다.
