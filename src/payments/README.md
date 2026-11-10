@@ -19,11 +19,12 @@
 | --- | --- | --- |
 | GET | /v1/payments?reservation_id=... | 본인 예매의 결제 시도 목록 |
 | GET | /v1/payments/{payment_id} | 본인 결제 조회 |
+| POST | /v1/payments | 본인 PENDING 예매 기반 결제 생성 |
 | POST | /v1/payments/{payment_id}/approve | 결제 승인 |
 | POST | /v1/payments/{payment_id}/cancel | 결제 전액 취소 |
 | POST | /v1/payments/{payment_id}/reconcile | 본인 결제의 결제사 결과 재조회·복구 |
 
-결제 생성은 예매 서비스에서 신뢰할 수 있는 금액으로 수행하도록 하며, 별도 공개 생성 API는 제공하지 않는다.
+결제 생성 요청은 `reservation_id`만 받는다. 서버가 예매 소유자, 상태, 만료 시각과 금액을 확인해 READY 결제를 만든다. 생성 후 클라이언트 결제창에서 받은 `paymentKey`와 금액으로 승인 API를 호출한다. 승인 API가 Toss 승인 요청을 수행하므로 결제 생성 API가 직접 Toss를 승인하지 않는다.
 
 승인 본문:
 

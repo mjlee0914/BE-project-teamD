@@ -93,6 +93,24 @@ class PaymentServiceTests(unittest.IsolatedAsyncioTestCase):
         self.repo.save.assert_awaited_once_with(result)
         self.processor.approve.assert_not_awaited()
 
+    async def test_create_then_approve_uses_created_order(self):
+        payment = await self.service.create(1, 10)
+        self.repo.find_by_id.return_value = payment
+        self.processor.approve.return_value = PaymentApprovalResult(
+            PaymentStatus.DONE,
+            datetime.now(UTC),
+            PaymentLog({"status": "done"}),
+            method="카드",
+        )
+
+        result = await self.service.approve(payment.payment_id or 7, "toss-key", 1000)
+
+        self.processor.approve.assert_awaited_once_with(
+            "toss-key", payment.order_id, payment.amount
+        )
+        self.assertEqual(result.status, PaymentStatus.DONE)
+        self.assertEqual(result.payment_key, "toss-key")
+
     async def test_create_rejects_reservation_owned_by_another_user(self):
         self.creation_context_provider.get_context.return_value = (
             PaymentCreationContext(
