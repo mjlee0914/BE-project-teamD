@@ -16,7 +16,8 @@ from shared.core.schemas import APIResponse, PageResponse
 from shared.core.time import today_kst
 from users.domain.exceptions import AdminPermissionDenied
 
-router = APIRouter(prefix="/v1/festivals", tags=["festivals"])
+# Swagger 그룹: 조회는 "festivals", 관리자 전용은 "festivals-admin" (엔드포인트마다 tags 지정)
+router = APIRouter(prefix="/v1/festivals")
 
 # CurrentActorDep, FestivalServiceDep 별칭 설정 - 의존성은 Annotated 방식으로 통일
 # FastAPI가 넣어주는 service (FastAPI가 wiring 등록부를 보고 진짜 service를 넣어준다.)
@@ -43,7 +44,7 @@ def _to_response(festival: Festival) -> FestivalResponse:
     )
 
 # 축제 생성
-@router.post("", status_code=201, response_model=APIResponse[FestivalResponse])
+@router.post("", status_code=201, response_model=APIResponse[FestivalResponse], tags=["festivals-admin"])
 async def create_festival(
     body: FestivalCreate, # 사용자가 보낸 JSON, FestivalCreate 스키마로 검사한 뒤 넣어준다. (형식 틀리면 함수 실행 전 422)
     service: FestivalServiceDep,
@@ -70,7 +71,7 @@ async def create_festival(
 # 축제 목록 불러오기
 # 응답은 축제 하나가 아닌 축제목록+전체개수+page+size의 페이지의 여러개이므로,
 # PageResponse로 받는다.
-@router.get("", response_model=APIResponse[PageResponse[FestivalResponse]])
+@router.get("", response_model=APIResponse[PageResponse[FestivalResponse]], tags=["festivals"])
 async def list_festivals(
     service: FestivalServiceDep,
     # Annotated[타입, Query(검사 규칙)] = 기본값
@@ -92,7 +93,7 @@ async def list_festivals(
 
 
 # 축제 상세 불러오기
-@router.get("/{festival_id}", response_model=APIResponse[FestivalResponse])
+@router.get("/{festival_id}", response_model=APIResponse[FestivalResponse], tags=["festivals"])
 async def get_festival(
     festival_id: int,
     service: FestivalServiceDep,
@@ -101,7 +102,7 @@ async def get_festival(
     return APIResponse.ok(data=_to_response(festival))
 
 # 축제 정보 수정
-@router.patch("/{festival_id}", response_model=APIResponse[FestivalResponse])
+@router.patch("/{festival_id}", response_model=APIResponse[FestivalResponse], tags=["festivals-admin"])
 async def update_festival(
     festival_id: int,
     body: FestivalUpdate,
@@ -121,7 +122,7 @@ async def update_festival(
     return APIResponse.ok(data=_to_response(festival))
 
 # 축제 취소
-@router.patch("/{festival_id}/cancel", response_model=APIResponse[FestivalResponse])
+@router.patch("/{festival_id}/cancel", response_model=APIResponse[FestivalResponse], tags=["festivals-admin"])
 async def cancel_festival(
     festival_id: int,
     service: FestivalServiceDep,

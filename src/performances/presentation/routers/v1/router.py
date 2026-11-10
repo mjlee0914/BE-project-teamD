@@ -14,10 +14,8 @@ from shared.core.actor import CurrentActor, get_current_actor
 from shared.core.schemas import APIResponse, PageResponse
 from users.domain.exceptions import AdminPermissionDenied
 
-router = APIRouter(
-    prefix="/v1",
-    tags=["performances"],
-)
+# Swagger 그룹: 조회는 "performances", 관리자 전용은 "performances-admin" (엔드포인트마다 tags 지정)
+router = APIRouter(prefix="/v1")
 # CurrentActorDep, PerformanceServiceDep 별칭 설정 - 의존성은 Annotated 방식으로 통일
 CurrentActorDep = Annotated[CurrentActor, Depends(get_current_actor)]
 PerformanceServiceDep = Annotated[PerformanceService, Depends(get_performance_service)]
@@ -34,7 +32,7 @@ def _require_admin(actor: CurrentActor) -> None:
 
 # 공연 회차 등록
 # POST /v1/festivals/{festival_id}/performances
-@router.post("/festivals/{festival_id}/performances", status_code=201, response_model=APIResponse[PerformanceResponse])
+@router.post("/festivals/{festival_id}/performances", status_code=201, response_model=APIResponse[PerformanceResponse], tags=["performances-admin"])
 async def create_performance(
     festival_id: int,
     body: PerformanceCreate,
@@ -58,7 +56,7 @@ async def create_performance(
 
 # 공연 회차 목록 조회 (축제별)
 # GET /v1/festivals/{festival_id}/performances
-@router.get("/festivals/{festival_id}/performances", response_model=APIResponse[PageResponse[PerformanceResponse]])
+@router.get("/festivals/{festival_id}/performances", response_model=APIResponse[PageResponse[PerformanceResponse]], tags=["performances"])
 async def list_performances(
     festival_id: int,
     service: PerformanceServiceDep,
@@ -73,14 +71,14 @@ async def list_performances(
 
 # 공연 회차 상세 조회
 # GET /v1/performances/{performance_id}
-@router.get("/performances/{performance_id}", response_model=APIResponse[PerformanceResponse])
+@router.get("/performances/{performance_id}", response_model=APIResponse[PerformanceResponse], tags=["performances"])
 async def get_performance(performance_id: int, service: PerformanceServiceDep):
     performance = await service.get_performance(performance_id)
     return APIResponse.ok(data=PerformanceResponse.model_validate(performance))
 
 # 공연 회차 정보 수정
 # PATCH /v1/performances/{performance_id}
-@router.patch("/performances/{performance_id}", response_model=APIResponse[PerformanceResponse])
+@router.patch("/performances/{performance_id}", response_model=APIResponse[PerformanceResponse], tags=["performances-admin"])
 async def update_performance(
     performance_id: int,
     body: PerformanceUpdate,
@@ -105,7 +103,7 @@ async def update_performance(
 # 상태 변경 API는 PATCH로 통일 (팀 회의 11/9)
 # 공연 예매 오픈
 # PATCH /v1/performances/{performance_id}/open
-@router.patch("/performances/{performance_id}/open", response_model=APIResponse[PerformanceResponse])
+@router.patch("/performances/{performance_id}/open", response_model=APIResponse[PerformanceResponse], tags=["performances-admin"])
 async def open_performance(
     performance_id: int,
     service: PerformanceServiceDep,
@@ -118,7 +116,7 @@ async def open_performance(
 
 # 공연 취소
 # PATCH /v1/performances/{performance_id}/cancel
-@router.patch("/performances/{performance_id}/cancel", response_model=APIResponse[PerformanceResponse])
+@router.patch("/performances/{performance_id}/cancel", response_model=APIResponse[PerformanceResponse], tags=["performances-admin"])
 async def cancel_performance(
     performance_id: int,
     service: PerformanceServiceDep,
@@ -131,7 +129,7 @@ async def cancel_performance(
 
 # 공연 종료
 # PATCH /v1/performances/{performance_id}/complete
-@router.patch("/performances/{performance_id}/complete", response_model=APIResponse[PerformanceResponse])
+@router.patch("/performances/{performance_id}/complete", response_model=APIResponse[PerformanceResponse], tags=["performances-admin"])
 async def complete_performance(
     performance_id: int,
     service: PerformanceServiceDep,
@@ -144,7 +142,7 @@ async def complete_performance(
 
 # 예매 가능 여부 조회
 # GET /v1/performances/{performance_id}/availability
-@router.get("/performances/{performance_id}/availability", response_model=APIResponse[AvailabilityResponse])
+@router.get("/performances/{performance_id}/availability", response_model=APIResponse[AvailabilityResponse], tags=["performances"])
 async def get_availability(
     performance_id: int,
     service: PerformanceServiceDep
