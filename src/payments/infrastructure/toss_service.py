@@ -99,7 +99,15 @@ class TossPaymentProcessor(PaymentProcessor):
         if status == PaymentStatus.WAITING_FOR_DEPOSIT and secret_hash is None:
             raise self._invalid_response()
         return PaymentApprovalResult(
-            status, paid_at, self._payment_log(data), method, secret_hash
+            status,
+            paid_at,
+            self._payment_log(data),
+            method,
+            secret_hash,
+            self._parse_time(data["virtualAccount"]["dueDate"])
+            if isinstance(data.get("virtualAccount"), dict)
+            and data["virtualAccount"].get("dueDate")
+            else None,
         )
 
     # 결제 키로 GET 조회하고 상태별 완료·취소 시각을 해석해 동기화용 결과를 반환한다.
@@ -151,6 +159,10 @@ class TossPaymentProcessor(PaymentProcessor):
             self._payment_log(data),
             method,
             self._secret_hash(data),
+            self._parse_time(data["virtualAccount"]["dueDate"])
+            if isinstance(data.get("virtualAccount"), dict)
+            and data["virtualAccount"].get("dueDate")
+            else None,
         )
 
     # 웹훅 검증용 secret의 SHA-256 값만 만든다. 원문 secret을 일반 거래 이력에 저장하지 않는다.

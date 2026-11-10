@@ -1,12 +1,14 @@
 # 파일 역할: 결제사·소유권 검사의 계약과 결과 데이터다. 도메인이 httpx나 SQLAlchemy를 직접 알 필요가 없게 한다.
 
 from abc import ABC, abstractmethod
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 
 from payments.domain.entities import PaymentLog
 from payments.domain.enums import PaymentStatus
+from reservations.domain.reservation import DEPOSIT_DUE_MARGIN
 
 
 # 외부 승인 응답에서 도메인에 필요한 상태·시각·이력·결제 수단만 추려 전달한다.
@@ -17,6 +19,7 @@ class PaymentApprovalResult:
     log: PaymentLog
     method: str | None = None
     webhook_secret_hash: str | None = None
+    virtual_account_due_at: datetime | None = None
 
 
 # 결제사에 재조회한 현재 결과다. 주문 식별과 상태 동기화에 필요한 정보를 함께 전달한다.
@@ -31,6 +34,7 @@ class PaymentSnapshot:
     log: PaymentLog
     method: str | None = None
     webhook_secret_hash: str | None = None
+    virtual_account_due_at: datetime | None = None
 
 
 # 외부 전액 취소가 완료된 시각과 저장 가능한 이력을 반환하는 데이터다.
@@ -66,6 +70,25 @@ class PaymentCreationContext:
     amount: int
     reservation_status: StrEnum
     expires_at: datetime | None
+
+    @property
+    def deposit_due_at(self) -> datetime | None:
+        if self.expires_at is None:
+            return None
+        expires = self.expires_at
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=UTC)
+        return expires - DEPOSIT_DUE_MARGIN
+
+
+class PaymentTransaction(ABC):
+    @abstractmethod
+    async def checkpoint(self) -> None:
+        """외부 호출 전에 복구에 필요한 기록을 확정한다."""
+
+    @abstractmethod
+    def savepoint(self) -> AbstractAsyncContextManager[None]:
+        """예매 확정 실패가 이미 확인한 결제 결과를 취소하지 않도록 격리한다."""
 
 
 class PaymentCreationContextProvider(ABC):

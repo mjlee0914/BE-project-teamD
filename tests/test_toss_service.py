@@ -1,6 +1,7 @@
 import base64
 import json
 import unittest
+from datetime import datetime
 from unittest.mock import patch
 
 import httpx
@@ -91,10 +92,15 @@ class TossPaymentProcessorTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_virtual_account_approval_is_not_marked_paid(self):
         self.response_body.update(status="WAITING_FOR_DEPOSIT", approvedAt=None)
+        self.response_body["virtualAccount"] = {"dueDate": "2027-01-02T15:05:00+09:00"}
         result = await self.approve()
         self.assertEqual(result.status, PaymentStatus.WAITING_FOR_DEPOSIT)
         self.assertIsNone(result.paid_at)
         self.assertIsNotNone(result.webhook_secret_hash)
+        self.assertEqual(
+            result.virtual_account_due_at,
+            datetime.fromisoformat("2027-01-02T15:05:00+09:00"),
+        )
         self.assertNotIn("webhook-secret", str(result))
 
     async def test_retrieve_uses_authenticated_get_and_parses_snapshot(self):
