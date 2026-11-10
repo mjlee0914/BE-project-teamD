@@ -2,7 +2,7 @@ import hashlib
 import unittest
 from copy import deepcopy
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import httpx
@@ -22,9 +22,11 @@ from payments.domain.exceptions import (
 )
 from payments.domain.repository import PaymentRepository
 from payments.domain.service import (
+    PaymentCreationContext,
     PaymentCreationContextProvider,
     PaymentProcessor,
     PaymentSnapshot,
+    PaymentTransaction,
 )
 from payments.presentation.routers.v1.webhook_router import (
     provide_deposit_webhook_service,
@@ -59,6 +61,10 @@ class DepositWebhookTests(unittest.IsolatedAsyncioTestCase):
         self.repo.save.side_effect = save
         self.processor = AsyncMock(spec=PaymentProcessor)
         self.reservation_service = AsyncMock(spec=ReservationService)
+        self.context = AsyncMock(spec=PaymentCreationContextProvider)
+        self.context.get_context.return_value = PaymentCreationContext(
+            1, 10, "Festival", 1000, "PENDING", datetime.now(UTC) + timedelta(hours=1)
+        )
         self.snapshot = PaymentSnapshot(
             "payment-key",
             self.saved.order_id,
@@ -68,10 +74,17 @@ class DepositWebhookTests(unittest.IsolatedAsyncioTestCase):
             None,
             PaymentLog({"status": "DONE"}),
             "가상계좌",
+            virtual_account_due_at=datetime.now(UTC) + timedelta(minutes=30),
         )
         self.processor.retrieve.return_value = self.snapshot
         self.service = DepositWebhookService(
-            self.processor, self.repo, self.reservation_service
+            PaymentService(
+                self.processor,
+                self.repo,
+                self.context,
+                self.reservation_service,
+                AsyncMock(spec=PaymentTransaction),
+            )
         )
 
     async def process(self, **overrides):
@@ -173,8 +186,9 @@ class DepositWebhookTests(unittest.IsolatedAsyncioTestCase):
         service = PaymentService(
             self.processor,
             self.repo,
-            AsyncMock(spec=PaymentCreationContextProvider),
+            self.context,
             self.reservation_service,
+            AsyncMock(spec=PaymentTransaction),
         )
         result = await service.reconcile(7, "payment-key")
         self.assertEqual(result.status, PaymentStatus.DONE)

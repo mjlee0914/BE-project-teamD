@@ -22,6 +22,7 @@ from payments.domain.service import (
     PaymentCreationContext,
     PaymentCreationContextProvider,
     PaymentProcessor,
+    PaymentTransaction,
     RefundAccount,
 )
 from payments.presentation.dependencies import (
@@ -269,7 +270,13 @@ class PaymentAPITests(unittest.IsolatedAsyncioTestCase):
             datetime.now(UTC) + timedelta(hours=1),
         )
         reservations = AsyncMock()
-        service = PaymentService(processor, repository, context, reservations)
+        service = PaymentService(
+            processor,
+            repository,
+            context,
+            reservations,
+            AsyncMock(spec=PaymentTransaction),
+        )
 
         # 실제 get_db와 라우터를 거쳐 502 응답에서도 commit이 실행되는지 확인한다.
         def provide_service(session=Depends(get_db)):

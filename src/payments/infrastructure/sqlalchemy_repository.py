@@ -3,14 +3,14 @@
 import hashlib
 import json
 from copy import deepcopy
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from payments.domain.entities import Payment, PaymentLog, ReservationInfo
-from payments.domain.enums import PaymentStatus
+from payments.domain.enums import PaymentRecoveryStatus, PaymentStatus
 from payments.domain.exceptions import (
     PaymentConcurrentUpdate,
     PaymentDuplicateIdentifier,
@@ -67,6 +67,16 @@ def _to_domain(model: PaymentModel, festival_name: str) -> Payment:
         webhook_secret_hash=metadata.get("webhook_secret_hash"),
         processed_deposit_events=list(metadata.get("processed_deposit_events", [])),
         persistence_token=_fingerprint(model),
+        recovery_status=PaymentRecoveryStatus(metadata["recovery_status"])
+        if metadata.get("recovery_status")
+        else None,
+        recovery_error=metadata.get("recovery_error"),
+        cancellation_reason=metadata.get("cancellation_reason"),
+        virtual_account_due_at=datetime.fromisoformat(
+            metadata["virtual_account_due_at"]
+        )
+        if metadata.get("virtual_account_due_at")
+        else None,
         payment_log=[
             PaymentLog(deepcopy(item))
             for item in model.payment_log
@@ -92,6 +102,12 @@ def _apply_changes(model: PaymentModel, payment: Payment) -> None:
                 "order_id": payment.order_id,
                 "webhook_secret_hash": payment.webhook_secret_hash,
                 "processed_deposit_events": list(payment.processed_deposit_events),
+                "recovery_status": payment.recovery_status,
+                "recovery_error": payment.recovery_error,
+                "cancellation_reason": payment.cancellation_reason,
+                "virtual_account_due_at": payment.virtual_account_due_at.isoformat()
+                if payment.virtual_account_due_at
+                else None,
             }
         }
     ] + [deepcopy(log.value) for log in payment.payment_log]
@@ -104,6 +120,56 @@ class SQLAlchemyPaymentRepository(PaymentRepository):
     # 외부에서 전달받은 의존성을 보관한다. 여기서 DB 연결이나 업무 처리를 새로 시작하지 않는다.
     def __init__(self, session: AsyncSession):
         self._session = session
+
+    async def find_recovery_candidates(
+        self, now: datetime, limit: int = 100
+    ) -> list[int]:
+        recovery = PaymentModel.payment_log[0]["_payment_metadata"][
+            "recovery_status"
+        ].as_string()
+        result = await self._session.scalars(
+            select(PaymentModel.id)
+            .join(ReservationModel, ReservationModel.id == PaymentModel.reservation_id)
+            .where(
+                or_(
+                    recovery.is_(None),
+                    recovery != PaymentRecoveryStatus.REFUND_ACCOUNT_REQUIRED,
+                ),
+                or_(
+                    recovery.in_(
+                        (
+                            PaymentRecoveryStatus.CONFIRMATION_PENDING,
+                            PaymentRecoveryStatus.CANCELLATION_PENDING,
+                        )
+                    ),
+                    and_(
+                        PaymentModel.status == PaymentStatus.IN_PROGRESS,
+                        PaymentModel.updated_at <= now - timedelta(seconds=30),
+                    ),
+                    and_(
+                        PaymentModel.status == PaymentStatus.DONE,
+                        ReservationModel.status == "PENDING",
+                    ),
+                    and_(
+                        PaymentModel.status.in_(
+                            (
+                                PaymentStatus.READY,
+                                PaymentStatus.DONE,
+                                PaymentStatus.WAITING_FOR_DEPOSIT,
+                            )
+                        ),
+                        ReservationModel.status.in_(("CANCELED", "EXPIRED")),
+                    ),
+                    and_(
+                        PaymentModel.status == PaymentStatus.WAITING_FOR_DEPOSIT,
+                        ReservationModel.expires_at <= now,
+                    ),
+                ),
+            )
+            .order_by(PaymentModel.updated_at.asc().nullsfirst(), PaymentModel.id)
+            .limit(limit)
+        )
+        return list(result)
 
     # 예매 행에 FOR UPDATE를 걸어 같은 예매의 결제 작업을 직렬화한다. 잠금은 트랜잭션이 끝날 때 풀린다.
     async def lock_reservation(self, reservation_id: int) -> None:

@@ -37,6 +37,7 @@ from payments.infrastructure.access_checker import (
 )
 from payments.infrastructure.models import PaymentModel
 from payments.infrastructure.sqlalchemy_repository import SQLAlchemyPaymentRepository
+from payments.infrastructure.transaction import SQLAlchemyPaymentTransaction
 from reservations.infrastructure.models import Reservation as ReservationModel
 from shared.core.models import Base
 
@@ -156,7 +157,7 @@ class PaymentPostgresTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(IntegrityError):
             await self.session.execute(
                 text(
-                    "INSERT INTO payments (reservation_id, amount, status, payment_log) "
+                    f'INSERT INTO "{self.schema}".payments (reservation_id, amount, status, payment_log) '
                     "VALUES (:reservation_id, 1000, 'UNKNOWN', '[]'::jsonb)"
                 ),
                 {"reservation_id": self.reservation_id},
@@ -229,6 +230,7 @@ class PaymentPostgresTests(unittest.IsolatedAsyncioTestCase):
             self.repository,
             SQLAlchemyPaymentCreationContextProvider(self.session),
             AsyncMock(),
+            SQLAlchemyPaymentTransaction(self.session),
         )
         payment = await service.create(self.reservation_id, self.user_id)
         with self.assertRaises(PaymentProcessingError):
@@ -249,6 +251,7 @@ class PaymentPostgresTests(unittest.IsolatedAsyncioTestCase):
             self.repository,
             SQLAlchemyPaymentCreationContextProvider(self.session),
             AsyncMock(),
+            SQLAlchemyPaymentTransaction(self.session),
         )
         payment = await service.create(self.reservation_id, self.user_id)
         processor.approve.return_value = PaymentApprovalResult(
@@ -257,6 +260,7 @@ class PaymentPostgresTests(unittest.IsolatedAsyncioTestCase):
             PaymentLog({"status": "WAITING_FOR_DEPOSIT"}),
             "가상계좌",
             hashlib.sha256(b"test-secret").hexdigest(),
+            datetime.now(UTC) + timedelta(minutes=30),
         )
         waiting = await service.approve(payment.payment_id, "test-key", 1000)
         self.assertEqual(waiting.status, PaymentStatus.WAITING_FOR_DEPOSIT)
@@ -276,7 +280,7 @@ class PaymentPostgresTests(unittest.IsolatedAsyncioTestCase):
             PaymentLog({"status": "DONE"}),
             "가상계좌",
         )
-        webhook = DepositWebhookService(processor, self.repository, AsyncMock())
+        webhook = DepositWebhookService(service)
         for _ in range(2):
             await webhook.process(
                 order_id=payment.order_id,

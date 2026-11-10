@@ -16,6 +16,7 @@ from payments.infrastructure.access_checker import (
 )
 from payments.infrastructure.sqlalchemy_repository import SQLAlchemyPaymentRepository
 from payments.infrastructure.toss_service import TossPaymentProcessor
+from payments.infrastructure.transaction import SQLAlchemyPaymentTransaction
 from payments.presentation.dependencies import (
     provide_payment_access_checker,
     provide_payment_service,
@@ -42,6 +43,7 @@ def build_payment_service(
         payment_repo=repository,
         creation_context_provider=creation_context_provider,
         reservation_service=build_reservation_service(session),
+        transaction=SQLAlchemyPaymentTransaction(session),
     )
 
 
@@ -58,13 +60,7 @@ def build_payment_access_checker(
 def build_deposit_webhook_service(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> DepositWebhookService:
-    processor: PaymentProcessor = TossPaymentProcessor.from_env()
-    repository = SQLAlchemyPaymentRepository(session)
-    return DepositWebhookService(
-        processor=processor,
-        repository=repository,
-        reservation_service=build_reservation_service(session),
-    )
+    return DepositWebhookService(build_payment_service(session))
 
 
 # 결제 API, 소유권 검사, 입금 웹훅의 placeholder 의존성을 실제 구현체로 바꾼다.

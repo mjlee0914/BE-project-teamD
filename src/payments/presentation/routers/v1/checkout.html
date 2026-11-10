@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>토스 결제</title>
+<script src="https://js.tosspayments.com/v2/standard"></script>
+<style>
+body{font:16px system-ui;max-width:760px;margin:40px auto;padding:20px}label{display:block;margin:18px 0}input,select,button{padding:10px;font:inherit}input{width:95%}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f5f7;padding:20px}button{cursor:pointer}
+</style>
+<h1>토스 결제</h1>
+<p>Swagger에서 생성한 결제 ID와 로그인 액세스 토큰을 입력하세요.</p>
+<label>결제 ID <input id="paymentId" type="number" min="1"></label>
+<label>액세스 토큰 <input id="token" type="password" autocomplete="off"></label>
+<label>결제수단 <select id="method"><option value="CARD">카드</option><option value="VIRTUAL_ACCOUNT">가상계좌</option></select></label>
+<button id="pay">결제창 열기</button>
+<pre id="result" role="status"></pre>
+<script>
+const output = document.querySelector('#result');
+const storageKey = 'teamd_pending_checkout';
+async function api(path, token, body) {
+  const response = await fetch('/v1/payments/' + path, {
+    method: body ? 'POST' : 'GET',
+    headers: {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'},
+    ...(body ? {body: JSON.stringify(body)} : {}),
+  });
+  const payload = await response.json();
+  output.textContent = JSON.stringify(payload, null, 2);
+  if (!response.ok) throw new Error(payload.message || payload.detail || '요청 실패');
+  return payload.data;
+}
+document.querySelector('#pay').onclick = async () => {
+  const button = document.querySelector('#pay');
+  button.disabled = true;
+  try {
+    const token = document.querySelector('#token').value.trim().replace(/^Bearer\s+/i, '');
+    const paymentId = Number(document.querySelector('#paymentId').value);
+    const config = await api(paymentId + '/checkout', token);
+    const method = document.querySelector('#method').value;
+    if (method === 'VIRTUAL_ACCOUNT' && Date.parse(config.deposit_due_at) <= Date.now()) {
+      throw new Error('가상계좌 입금 마감이 지났습니다. 새 예매가 필요합니다.');
+    }
+    sessionStorage.setItem(storageKey, JSON.stringify({token, paymentId, orderId: config.order_id, amount: config.amount}));
+    const success = new URL(location.pathname, location.origin);
+    success.searchParams.set('stage', 'success');
+    const fail = new URL(location.pathname, location.origin);
+    fail.searchParams.set('stage', 'fail');
+    await TossPayments(config.client_key).payment({customerKey: config.customer_key}).requestPayment({
+      method, amount: {value: config.amount, currency: 'KRW'},
+      orderId: config.order_id, orderName: config.order_name,
+      successUrl: success.href, failUrl: fail.href,
+      ...(method === 'VIRTUAL_ACCOUNT' ? {virtualAccount: {dueDate: config.virtual_account_due_date}} : {}),
+    });
+  } catch (error) { output.textContent += '\n' + error.message; }
+  finally { button.disabled = false; }
+};
+(async () => {
+  const params = new URLSearchParams(location.search);
+  if (!params.has('stage')) return;
+  history.replaceState(null, '', location.pathname);
+  const raw = sessionStorage.getItem(storageKey);
+  if (params.get('stage') === 'fail') {
+    output.textContent = '결제창 인증 실패: ' + (params.get('code') || '사용자 취소');
+    sessionStorage.removeItem(storageKey);
+    return;
+  }
+  try {
+    if (!raw) throw new Error('결제 요청 정보가 없습니다. Swagger에서 결제 상태를 확인하세요.');
+    const saved = JSON.parse(raw);
+    if (params.get('orderId') !== saved.orderId || Number(params.get('amount')) !== saved.amount) {
+      throw new Error('주문번호 또는 금액이 일치하지 않습니다.');
+    }
+    await api(saved.paymentId + '/approve', saved.token, {
+      payment_key: params.get('paymentKey'), amount: saved.amount,
+    });
+  } catch (error) { output.textContent += '\n' + error.message + '\n승인 결과가 불명이면 Swagger의 결제 재조회를 이용하세요.'; }
+  finally { sessionStorage.removeItem(storageKey); }
+})();
+</script>
+</html>
