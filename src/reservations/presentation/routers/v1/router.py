@@ -19,6 +19,8 @@
 """
 
 # 외부 라이브러리
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, Query, status
 
 # 프로젝트 코드
@@ -39,6 +41,11 @@ admin_router = APIRouter(prefix="/v1/festivals", tags=["reservations-admin"])
 
 
 # 관리자 검사 (티켓 라우터와 같은 방식 : 관리자 전용 API는 라우터에서 막음)
+# 의존성 별칭 - Annotated 방식으로 통일 (기본값 자리에 Depends를 쓰지 않음 → ruff B008 방지)
+ReservationServiceDep = Annotated[ReservationService, Depends(provide_reservation_service)]
+CurrentActorDep = Annotated[CurrentActor, Depends(get_current_actor)]
+
+
 def _require_admin(actor: CurrentActor) -> None:
     if not actor.is_admin:
         raise AdminPermissionDenied()
@@ -53,8 +60,8 @@ def _require_admin(actor: CurrentActor) -> None:
 )
 async def create_reservation(
     body: ReservationCreate,
-    service: ReservationService = Depends(provide_reservation_service),
-    actor: CurrentActor = Depends(get_current_actor),
+    service: ReservationServiceDep,
+    actor: CurrentActorDep,
 ):
     reservation = await service.create_reservation(
         festival_id=body.festival_id,
@@ -76,8 +83,8 @@ async def create_reservation(
     summary="예매 목록 조회",
 )
 async def get_my_reservations(
-    service: ReservationService = Depends(provide_reservation_service),
-    actor: CurrentActor = Depends(get_current_actor),
+    service: ReservationServiceDep,
+    actor: CurrentActorDep,
 ):
     reservations = await service.get_my_reservations(actor.user_id)
     responses = [ReservationResponse.model_validate(r) for r in reservations]
@@ -92,8 +99,8 @@ async def get_my_reservations(
 )
 async def get_reservation(
     reservation_id: int,
-    service: ReservationService = Depends(provide_reservation_service),
-    actor: CurrentActor = Depends(get_current_actor),
+    service: ReservationServiceDep,
+    actor: CurrentActorDep,
 ):
     reservation = await service.get_reservation(
         reservation_id, actor.user_id, actor.is_admin
@@ -112,8 +119,8 @@ async def get_reservation(
 )
 async def cancel_reservation(
     reservation_id: int,
-    service: ReservationService = Depends(provide_reservation_service),
-    actor: CurrentActor = Depends(get_current_actor),
+    service: ReservationServiceDep,
+    actor: CurrentActorDep,
 ):
     reservation = await service.cancel_reservation(
         reservation_id, actor.user_id, actor.is_admin
@@ -135,12 +142,12 @@ async def cancel_reservation(
 )
 async def list_festival_reservations(
     festival_id: int,
-    day: TicketType | None = Query(None, description="SAT 또는 SUN"),
-    statuses: list[ReservationStatus] | None = Query(None),
-    page: int = Query(1, ge=1),
-    size: int = Query(10, ge=1, le=100),
-    service: ReservationService = Depends(provide_reservation_service),
-    actor: CurrentActor = Depends(get_current_actor),
+    service: ReservationServiceDep,
+    actor: CurrentActorDep,
+    day: Annotated[TicketType | None, Query(description="SAT 또는 SUN")] = None,
+    statuses: Annotated[list[ReservationStatus] | None, Query()] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    size: Annotated[int, Query(ge=1, le=100)] = 10,
 ):
     _require_admin(actor)
     items, total = await service.list_festival_reservations(

@@ -4,7 +4,7 @@
 [생성]
 1. 예매는 축제(festival_id), 사용자(user_id), 수량, 티켓 종류, 금액, 축제 이름·장소를 받아 생성한다.
 2. 새 예매의 상태는 항상 PENDING(입금 대기)이다.
-3. 결제는 토스 가상계좌(무통장입금) 기준이며, 입금 기한(expires_at)은 생성 시각 + 24시간이다.
+3. 결제는 토스 가상계좌(무통장입금) 기준이며, 입금 기한(expires_at)은 생성 시각 + 10분이다. (가상계좌 입금 마감은 그보다 5분 이른 deposit_due_at)
 4. 축제 이름·장소·금액은 예매 시점의 값을 그대로 저장한다(스냅샷). 이후 축제 정보가 바뀌어도 예매 내역은 바뀌지 않는다.
 
 [금액]
@@ -47,7 +47,10 @@ from reservations.domain.exceptions import (
 )
 from shared.core.enums import TicketType
 
-DEPOSIT_EXPIRE_HOURS = 24  # 예매 대기 시간
+DEPOSIT_EXPIRE_MINUTES = 10  # 예매 대기 시간 (생성 후 10분 안에 입금하지 않으면 만료)
+# 가상계좌 입금 마감 여유 : 예매 만료(expires_at)보다 5분 먼저 입금을 닫는다
+# - 토스·우리 서버 시계 차이, 입금 알림 지연이 있어도 "만료된 예매에 입금"이 생기지 않게 함
+DEPOSIT_DUE_MARGIN = timedelta(minutes=5)
 MAX_QUANTITY_PER_RESERVATION = 2  # 티켓 최대 수량
 DISCOUNT_RATE = {
     DiscountType.NONE: 0,
@@ -79,6 +82,14 @@ class Reservation:
     confirmed_at: datetime | None = None  # 예매 승인 시간
     canceled_at: datetime | None = None  # 예매 취소 시간
     updated_at: datetime | None = None  # 예매 수정 시간
+
+    # 가상계좌 입금 마감 시각 (= 예매 만료 - 5분)
+    # - 결제창(토스 가상계좌 dueDate)에 이 값을 넣어 예매보다 먼저 입금이 닫히게 함
+    @property
+    def deposit_due_at(self) -> datetime | None:
+        if self.expires_at is None:
+            return None
+        return self.expires_at - DEPOSIT_DUE_MARGIN
 
     def __post_init__(self) -> None:  # 데이터 검증
         # 티켓 수량은 1장 이상이어야 한다.
@@ -127,7 +138,7 @@ class Reservation:
     ) -> "Reservation":
 
         created_at = now
-        expires_at = now + timedelta(hours=DEPOSIT_EXPIRE_HOURS)
+        expires_at = now + timedelta(minutes=DEPOSIT_EXPIRE_MINUTES)
         total_price = unit_price * quantity
         discount_amount = total_price * DISCOUNT_RATE[discount_type] // 100
         final_price = total_price - discount_amount

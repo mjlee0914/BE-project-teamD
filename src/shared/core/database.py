@@ -43,7 +43,7 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 # FastAPI에 데이터베이스 세션 제공 함수 정의
-# 사용법: async def api(db: AsyncSession = Depends(get_db))
+# 사용법: async def api(db: Annotated[AsyncSession, Depends(get_db)])
 # 요청마다 세션을 하나 열고, 요청이 끝나면 자동으로 닫음
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
