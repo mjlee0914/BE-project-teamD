@@ -41,7 +41,6 @@ from performances.domain.repository import PerformanceRepository
 from reservations.domain.enums import DiscountType, ReservationStatus
 from reservations.domain.exceptions import (
     CancelDeadlineViolation,
-    ReservationAdminOnly,
     ReservationNotAvailable,
     ReservationNotFound,
 )
@@ -52,6 +51,7 @@ from reservations.domain.service import check_daily_limit
 # 공통
 from shared.core.enums import TicketType
 from shared.core.time import KST, now_utc, today_kst
+from users.domain.exceptions import AdminPermissionDenied
 
 # 진행 중인 예매 상태 : 공연 취소 시 일괄 취소 대상
 ACTIVE_STATUSES = [ReservationStatus.PENDING, ReservationStatus.CONFIRMED]
@@ -202,12 +202,16 @@ class ReservationService:
         self, reservation_id: int, user_id: int, is_admin: bool
     ) -> Reservation:
         # ① 예매 조회 (본인 또는 관리자 확인 포함)
+        await self._reservation_repo.lock(reservation_id)
         reservation = await self.get_reservation(reservation_id, user_id, is_admin)
 
         # ② 회차 조회
         performances = await self._find_target_performance(
             reservation.festival_id, reservation.ticket_type
         )
+        # 종료된 공연의 예매는 취소 불가 (관리자·일반 회원 공통)
+        if any(p.status == PerformanceStatus.COMPLETED for p in performances):
+            raise CancelDeadlineViolation("종료된 공연의 예매는 취소할 수 없습니다.")
         now = now_utc()
 
         # ③ 마감 확인
@@ -245,7 +249,7 @@ class ReservationService:
         size: int,
     ) -> tuple[list[Reservation], int]:
         if not is_admin:
-            raise ReservationAdminOnly()
+            raise AdminPermissionDenied()
 
         festival = await self._festival_repo.find_by_id(festival_id)
         if festival is None:

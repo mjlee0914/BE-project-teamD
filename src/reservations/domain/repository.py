@@ -66,3 +66,8 @@ class ReservationRepository(ABC):
     @abstractmethod
     async def exists_active_by_user(self, user_id: int) -> bool:
         """사용자에게 PENDING 또는 CONFIRMED 예매가 있으면 True"""
+
+    # 예매 행 잠금 (취소·확정·일괄 취소에서 동시 처리 방지)
+    @abstractmethod
+    async def lock(self, reservation_id: int) -> None:
+        """예매 행 잠금 (SELECT ... FOR UPDATE)"""
