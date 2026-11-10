@@ -187,17 +187,16 @@ class User:
     def change_password(
         self, old_password: str, new_password: str, hasher: PasswordHasher
     ) -> None:
-        # [1] 상태 검사: 탈퇴 회원은 계정 조작 불가 → 409 (규칙 12)
+        # [1] 상태 검사: 탈퇴 회원은 비밀번호 변경 불가 → 403 (규칙 12)
         if self.status == UserStatus.WITHDRAWN:
-            raise InvalidUserStatus(
-                f"이미 탈퇴한 회원입니다. [현재 상태 : {self.status}]"
+            raise InactiveUser(
+                f"탈퇴한 회원은 비밀번호를 변경할 수 없습니다. [현재 상태 : {self.status}]"
             )
         # [2] 본인 확인: 입력한 기존 비밀번호를 저장된 해시와 비교 (규칙 13)
         if not hasher.verify(old_password, self.password_hash):
             raise InvalidPassword(
                 "기존 비밀번호가 일치하지 않습니다.",
             )
-
         # [3] 재사용 방지: 평문끼리 비교 (같은 값이면 422) (규칙 14)
         if old_password == new_password:
             raise InvalidPassword(
