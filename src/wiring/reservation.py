@@ -25,7 +25,7 @@ from shared.core.database import get_db
 from tickets.infrastructure.repositories import SqlAlchemyTicketRepository
 
 
-# 예매 서비스 조립 (저장소 3개에 "같은 세션" → 한 트랜잭션)
+# 예매 서비스 조립 (저장소 4개에 "같은 세션" → 한 트랜잭션)
 def build_reservation_service(
     session: AsyncSession = Depends(get_db),
 ) -> ReservationService:
