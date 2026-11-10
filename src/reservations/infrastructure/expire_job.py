@@ -19,6 +19,7 @@ from reservations.application.service import ReservationService
 from reservations.infrastructure.repositories import SqlalchemyReservationRepository
 from shared.core.database import AsyncSessionLocal
 from shared.core.logger import get_logger
+from tickets.infrastructure.repositories import SqlAlchemyTicketRepository
 
 logger = get_logger(__file__)
 
@@ -32,6 +33,7 @@ async def run_expire_once() -> int:
                 reservation_repo=SqlalchemyReservationRepository(session),
                 festival_repo=SqlAlchemyFestivalRepository(session),
                 performance_repo=SqlAlchemyPerformanceRepository(session),
+                ticket_repo=SqlAlchemyTicketRepository(session),
             )
             count = await service.expire_overdue()
             await session.commit()

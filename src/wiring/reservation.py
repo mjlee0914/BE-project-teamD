@@ -31,6 +31,7 @@ from reservations.presentation.dependencies import (
 )
 from shared.core.database import get_db
 from shared.core.exceptions import UnauthorizedException
+from tickets.infrastructure.repositories import SqlAlchemyTicketRepository
 from users.infrastructure.repositories import SqlAlchemyUserRepository
 
 
@@ -42,6 +43,7 @@ def build_reservation_service(
         reservation_repo=SqlalchemyReservationRepository(session),
         festival_repo=SqlAlchemyFestivalRepository(session),
         performance_repo=SqlAlchemyPerformanceRepository(session),
+        ticket_repo=SqlAlchemyTicketRepository(session),
     )
 
 

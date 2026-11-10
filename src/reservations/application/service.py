@@ -51,11 +51,18 @@ from reservations.domain.service import check_daily_limit
 # 공통
 from shared.core.enums import TicketType
 from shared.core.time import KST, now_utc, today_kst
-from users.domain.exceptions import AdminPermissionDenied
+from tickets.domain.enums import TicketStatus
+
+# 티켓 도메인 (예매 확정 시 발급, 예매·공연 취소 시 함께 취소 : #134)
+from tickets.domain.repository import TicketRepository
+from tickets.domain.ticket import Ticket
 
 # 잔여 수량을 되돌릴 수 있는 공연 상태
 # - 취소·종료된 공연은 공연 엔티티가 복구를 거부(409)하므로 미리 걸러서 건너뛴다
 RESTORABLE_STATUSES = (PerformanceStatus.OPEN, PerformanceStatus.SOLD_OUT)
+
+# 이미 처리가 끝난 티켓 상태 : 함께 취소할 때 건너뜀
+FINAL_TICKET_STATUSES = (TicketStatus.CANCELED, TicketStatus.USED, TicketStatus.EXPIRED)
 
 
 class ReservationService:
@@ -65,10 +72,12 @@ class ReservationService:
         reservation_repo: ReservationRepository,
         festival_repo: FestivalRepository,
         performance_repo: PerformanceRepository,
+        ticket_repo: TicketRepository,
     ) -> None:
         self._reservation_repo = reservation_repo
         self._festival_repo = festival_repo
         self._performance_repo = performance_repo
+        self._ticket_repo = ticket_repo
 
     # ------------------------------------------------------------------
     # 내부 도우미
@@ -109,6 +118,38 @@ class ReservationService:
                 continue
             performance.increase_remaining(reservation.quantity)
             await self._performance_repo.save(performance)
+
+    # 티켓 발급 (예매 확정 시)
+    # - 회차마다 수량만큼 생성 → ISSUED로 확정 → 저장 (양일권 2장이면 토 2 + 일 2 = 4장)
+    # - 가격은 회차 정가 스냅샷 (할인은 예매에서 계산)
+    async def _issue_tickets(
+        self, reservation: Reservation, performances: list[Performance]
+    ) -> None:
+        now = now_utc()
+        for performance in performances:
+            for _ in range(reservation.quantity):
+                ticket = Ticket(
+                    reservation_id=reservation.id,
+                    performance_id=performance.id,
+                    price=performance.price,
+                    performance_title=performance.title,
+                    performance_start_at=performance.starts_at,
+                    performance_end_at=performance.ends_at,
+                    cancel_deadline_at=performance.cancel_deadline_at,
+                )
+                ticket.confirm(now)
+                await self._ticket_repo.save(ticket)
+
+    # 티켓 함께 취소 (예매 취소·공연 취소 시)
+    # - 이미 끝난 티켓(CANCELED·USED·EXPIRED)은 건너뜀
+    # - force_cancel : 티켓 취소 마감은 보지 않음 (마감 판단은 예매에서 이미 함)
+    async def _cancel_tickets(self, reservation_id: int, now: datetime) -> None:
+        tickets = await self._ticket_repo.find_all_by_reservation(reservation_id)
+        for ticket in tickets:
+            if ticket.status in FINAL_TICKET_STATUSES:
+                continue
+            ticket.force_cancel(now)
+            await self._ticket_repo.save(ticket)
 
     # ------------------------------------------------------------------
     # 사용자 유스케이스
@@ -221,8 +262,9 @@ class ReservationService:
                 if now > performance.cancel_deadline_at:
                     raise CancelDeadlineViolation()
 
-        # ④ 상태 변경 (이미 끝난 예매면 엔티티가 409)
+        # ④ 상태 변경 (이미 끝난 예매면 엔티티가 409) + 발급된 티켓 함께 취소
         reservation.cancel(now)
+        await self._cancel_tickets(reservation.id, now)
 
         # ⑤ 잔여 수량 복구 → ⑥ 저장
         await self._restore_remaining(reservation)
@@ -239,15 +281,11 @@ class ReservationService:
     async def list_festival_reservations(
         self,
         festival_id: int,
-        is_admin: bool,
         day: TicketType | None,
         statuses: list[ReservationStatus] | None,
         page: int,
         size: int,
     ) -> tuple[list[Reservation], int]:
-        if not is_admin:
-            raise AdminPermissionDenied()
-
         festival = await self._festival_repo.find_by_id(festival_id)
         if festival is None:
             raise FestivalNotFound()
@@ -280,8 +318,17 @@ class ReservationService:
         reservation = await self._reservation_repo.find_by_id(reservation_id)
         if reservation is None:
             raise ReservationNotFound()
+        if reservation.status == ReservationStatus.CONFIRMED:
+            return reservation
         reservation.confirm(now_utc())
-        return await self._reservation_repo.save(reservation)
+        saved = await self._reservation_repo.save(reservation)
+
+        # 확정된 예매의 티켓 발급 (같은 세션 → 발급 실패 시 확정도 함께 rollback)
+        performances = await self._find_target_performance(
+            saved.festival_id, saved.ticket_type
+        )
+        await self._issue_tickets(saved, performances)
+        return saved
 
     # [작업 3] 입금 기한 지난 예매 만료
     # - 주기 작업(reservations/infrastructure/expire_job.py)이 몇 분마다 호출
@@ -320,6 +367,7 @@ class ReservationService:
         now = now_utc()
         for reservation in targets:
             reservation.cancel(now)
+            await self._cancel_tickets(reservation.id, now)
             await self._restore_remaining(reservation)
             await self._reservation_repo.save(reservation)
         return len(targets)
