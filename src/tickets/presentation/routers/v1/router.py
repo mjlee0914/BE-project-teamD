@@ -1,6 +1,5 @@
 """
 # 엔드포인트 (prefix: /v1/tickets) — 관리자 전용 경로를 따로 두지 않는다
-- POST  ""                     티켓 생성 (예매 승인 후)
 - GET   ""                     티켓 목록: 일반 회원은 내 티켓, 관리자는 전체 검색
 - POST  "/enter"               입장 처리 (관리자만)
 - GET   "/entry-status"        회차별 입장 현황 (관리자만)
@@ -14,7 +13,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query  #status
 
 from shared.core.exceptions import ForbiddenException
 from shared.core.schemas import APIResponse, PageResponse
@@ -27,7 +26,7 @@ from tickets.presentation.dependencies import (
 )
 from tickets.presentation.schemas import (
     EntryStatusResponse,
-    TicketCreateRequest,
+    #TicketCreateRequest,
     TicketDetailResponse,
     TicketEnterRequest,
     TicketEnterResponse,
@@ -47,21 +46,24 @@ def _require_admin(actor: CurrentActor) -> None:
         raise ForbiddenException("관리자만 이용할 수 있습니다.")
 
 
+# 티켓 "발급"은 여기서 하지 않는다: 예매가 확정될 때
+# ReservationService.confirm_reservation이 _issue_tickets로 자동 발급한다 (#134)
+# 여기는 조회·취소·입장·관리자 기능만 담당한다
 # 티켓 생성: 승인된 예매의 티켓을 전부 만든다 (양일권 수량 2면 4장)
-@router.post(
-    "",
-    response_model=APIResponse[list[TicketDetailResponse]],
-    status_code=status.HTTP_201_CREATED,
-    summary="티켓 생성",
-)
-async def create_tickets(
-    body: TicketCreateRequest,
-    actor: Actor,
-    service: Service,
-):
-    tickets = await service.create_tickets(body.reservation_id, actor.user_id)
-    items = [TicketDetailResponse.model_validate(ticket) for ticket in tickets]
-    return APIResponse.ok(data=items)
+# @router.post(
+#     "",
+#     response_model=APIResponse[list[TicketDetailResponse]],
+#     status_code=status.HTTP_201_CREATED,
+#     summary="티켓 생성",
+# )
+# async def create_tickets(
+#     body: TicketCreateRequest,
+#     actor: Actor,
+#     service: Service,
+# ):
+#     tickets = await service.create_tickets(body.reservation_id, actor.user_id)
+#     items = [TicketDetailResponse.model_validate(ticket) for ticket in tickets]
+#     return APIResponse.ok(data=items)
 
 
 # 티켓 목록

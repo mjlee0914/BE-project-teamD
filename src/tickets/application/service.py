@@ -4,18 +4,10 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from performances.domain.exceptions import PerformanceNotFound
-from performances.domain.performance import Performance
 from performances.domain.repository import PerformanceRepository
-from reservations.domain.enums import ReservationStatus
-from reservations.domain.exceptions import ReservationNotFound
 from reservations.domain.repository import ReservationRepository
-from shared.core.enums import TicketType
-from shared.core.time import KST
 from tickets.domain.exceptions import (
-    TicketAlreadyIssued,
     TicketNotFound,
-    TicketNotIssuable,
 )
 from tickets.domain.repository import TicketRepository  # 설계도 가져오기
 from tickets.domain.ticket import (
@@ -57,48 +49,48 @@ class TicketService:
     # --- 생성 ---
 
     # 승인된 예매의 티켓을 모두 만든다 (회차 수 × 수량)
-    async def create_tickets(self, reservation_id: int, user_id: int) -> list[Ticket]:
-        # ① 예매 행 잠금: 같은 예매의 발급 요청이 동시에 오면 한 줄로 세운다
-        # 잠음은 예매조회보다 먼저 작성.
-        await self._ticket_repo.lock_reservation(reservation_id, user_id)
+    # async def create_tickets(self, reservation_id: int, user_id: int) -> list[Ticket]:
+    #     # ① 예매 행 잠금: 같은 예매의 발급 요청이 동시에 오면 한 줄로 세운다
+    #     # 잠음은 예매조회보다 먼저 작성.
+    #     await self._ticket_repo.lock_reservation(reservation_id, user_id)
 
-        # ② 예매 조회: 없거나 남의 예매면 똑같이 404 (존재 여부를 숨김)
-        reservation = await self._reservation_repo.find_by_id(reservation_id)
-        if reservation is None or reservation.user_id != user_id:
-            raise ReservationNotFound()
+    #     # ② 예매 조회: 없거나 남의 예매면 똑같이 404 (존재 여부를 숨김)
+    #     reservation = await self._reservation_repo.find_by_id(reservation_id)
+    #     if reservation is None or reservation.user_id != user_id:
+    #         raise ReservationNotFound()
 
-        # ③ 승인된 예매만 티켓을 발급한다
-        if reservation.status != ReservationStatus.CONFIRMED:
-            raise TicketNotIssuable()
+    #     # ③ 승인된 예매만 티켓을 발급한다
+    #     if reservation.status != ReservationStatus.CONFIRMED:
+    #         raise TicketNotIssuable()
 
-        # ④ 중복 발급 검사: 티켓은 한 번에 전부 만들어지므로 하나라도 있으면 이미 발급됨
-        #    (취소된 티켓도 세므로 취소 후 재발급은 불가)
-        if await self._ticket_repo.count_by_reservation_id(reservation_id) > 0:
-            raise TicketAlreadyIssued()
+    #     # ④ 중복 발급 검사: 티켓은 한 번에 전부 만들어지므로 하나라도 있으면 이미 발급됨
+    #     #    (취소된 티켓도 세므로 취소 후 재발급은 불가)
+    #     if await self._ticket_repo.count_by_reservation_id(reservation_id) > 0:
+    #         raise TicketAlreadyIssued()
 
-        # ⑤ 티켓 종류에 맞는 회차 조회 (SAT·SUN은 1개, BOTH는 2개)
-        performances = await self._find_target_performances(
-            reservation.festival_id, reservation.ticket_type
-        )
+    #     # ⑤ 티켓 종류에 맞는 회차 조회 (SAT·SUN은 1개, BOTH는 2개)
+    #     performances = await self._find_target_performances(
+    #         reservation.festival_id, reservation.ticket_type
+    #     )
 
-        # ⑥ 회차마다 수량만큼 티켓 생성 → 확정(ISSUED) → 저장
-        now = datetime.now(UTC)
-        tickets: list[Ticket] = []
-        for performance in performances:
-            for _ in range(reservation.quantity):
-                ticket = Ticket(
-                    reservation_id=reservation_id,
-                    performance_id=performance.id,
-                    price=performance.price,  # 정가 스냅샷 (할인은 예매에서 계산)
-                    performance_title=performance.title,
-                    performance_start_at=performance.starts_at,
-                    performance_end_at=performance.ends_at,
-                    cancel_deadline_at=performance.cancel_deadline_at,
-                )
-                ticket.confirm(now)
-                # save의 반환값을 써야 DB가 채운 id가 들어 있다
-                tickets.append(await self._ticket_repo.save(ticket))
-        return tickets
+    #     # ⑥ 회차마다 수량만큼 티켓 생성 → 확정(ISSUED) → 저장
+    #     now = datetime.now(UTC)
+    #     tickets: list[Ticket] = []
+    #     for performance in performances:
+    #         for _ in range(reservation.quantity):
+    #             ticket = Ticket(
+    #                 reservation_id=reservation_id,
+    #                 performance_id=performance.id,
+    #                 price=performance.price,  # 정가 스냅샷 (할인은 예매에서 계산)
+    #                 performance_title=performance.title,
+    #                 performance_start_at=performance.starts_at,
+    #                 performance_end_at=performance.ends_at,
+    #                 cancel_deadline_at=performance.cancel_deadline_at,
+    #             )
+    #             ticket.confirm(now)
+    #             # save의 반환값을 써야 DB가 채운 id가 들어 있다
+    #             tickets.append(await self._ticket_repo.save(ticket))
+    #     return tickets
 
     # --- 상태 변경 ---
 
@@ -138,6 +130,7 @@ class TicketService:
     # --- 내부 도우미 ---
 
     # 축제의 회차 중 티켓 종류의 요일에 해당하는 회차를 고른다 (예매 서비스와 같은 기준)
+    '''
     async def _find_target_performances(
         self, festival_id: int, ticket_type: TicketType
     ) -> list[Performance]:
@@ -155,3 +148,4 @@ class TicketService:
         if len(selected) != len(weekdays):
             raise PerformanceNotFound()
         return selected
+        '''
