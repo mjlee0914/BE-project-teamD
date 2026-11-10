@@ -8,9 +8,10 @@
 - 404 NotFound      : 찾는 회원이 없음
 - 409 Conflict      : 현재 데이터 상태와 충돌 (이미 가입된 이메일, 이미 탈퇴한 회원)
 - 422 Unprocessable : 입력이 회원 규칙을 위반 (형식 오류, 길이 위반)
-- 403 Forbidden     : 누구인지는 아는데 권한이 없음 (남의 계정 탈퇴)
+- 403 Forbidden     : 누구인지는 아는데 권한이 없음 (남의 계정 탈퇴, 탈퇴 회원의 이용 요청)
 """
 
+# shared/core/exceptions.py
 from shared.core.exceptions import (
     ConflictException,
     ForbiddenException,
@@ -62,7 +63,7 @@ class InvalidPhone(UnprocessableException):
         super().__init__(message=message, error_code="INVALID_PHONE")
 
 
-# 현재 상태에서 처리 불가 : 탈퇴 회원 -> 탈퇴 회원의 비밀번호 변경 (규칙 12, 16)
+# 현재 상태와 충돌 : 이미 탈퇴한 회원의 중복 탈퇴 요청 (규칙 16)
 class InvalidUserStatus(ConflictException):
     def __init__(self, message: str = "현재 회원 상태에서 처리할 수 없는 요청입니다."):
         super().__init__(message=message, error_code="INVALID_USER_STATUS")
@@ -74,7 +75,7 @@ class WithdrawPermissionDenied(ForbiddenException):
         super().__init__(message=message, error_code="WITHDRAW_PERMISSION_DENIED")
 
 
-# ACTIVE가 아닌 회원의 로그인, 예매, 정보 수정 요청 (규칙 21, 22, 23)
+# ACTIVE가 아닌 회원의 로그인, 예매, 정보 수정, 비밀번호 변경, 관리자 기능 요청 (규칙 12, 21, 22, 23, 26)
 class InactiveUser(ForbiddenException):
     def __init__(self, message: str = "이용할 수 없는 회원 상태입니다."):
         super().__init__(message=message, error_code="INACTIVE_USER")
