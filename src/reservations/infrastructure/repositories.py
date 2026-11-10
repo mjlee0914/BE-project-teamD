@@ -105,6 +105,15 @@ class SqlalchemyReservationRepository(ReservationRepository):
         model = await self.session.get(ReservationModel, reservation_id)
         return self._to_entity(model) if model else None
 
+    async def lock(self, reservation_id: int) -> None:
+        stmt = (
+            select(ReservationModel.id)
+            .where(ReservationModel.id == reservation_id)
+            .with_for_update()
+        )
+        await self.session.execute(stmt)
+
+
     # 예매 저장
     async def save(self, reservation: Reservation) -> Reservation:
         if reservation.id is not None:  # 예매가 존재하면 수정

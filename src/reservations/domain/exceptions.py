@@ -1,6 +1,5 @@
 from shared.core.exceptions import (
     ConflictException,
-    ForbiddenException,
     NotFoundException,
     UnprocessableException,
 )
@@ -60,8 +59,3 @@ class CancelDeadlineViolation(ConflictException):
         super().__init__(message=message, error_code="CANCEL_DEADLINE_VIOLATION")
 
 
-# 관리자 전용 기능을 일반 회원이 호출함 (403)
-# - 축제별 예매 목록처럼 관리자만 쓰는 API에서 사용
-class ReservationAdminOnly(ForbiddenException):
-    def __init__(self, message: str = "관리자만 이용할 수 있습니다."):
-        super().__init__(message=message, error_code="RESERVATION_ADMIN_ONLY")

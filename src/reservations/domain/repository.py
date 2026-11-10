@@ -55,3 +55,7 @@ class ReservationRepository(ABC):
         statuses: list[ReservationStatus] | None,
     ) -> int:
         """축제별 예매 전체 개수"""
+
+    @abstractmethod
+    async def lock(self, reservation_id: int) -> None:
+        """ 예매 행 장금 (SELECT .... FOR UPDATE)"""
