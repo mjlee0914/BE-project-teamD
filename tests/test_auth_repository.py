@@ -23,7 +23,7 @@ class TokenBlacklistRepositoryTests(unittest.IsolatedAsyncioTestCase):
                 (
                     "from shared.core.models import Base, init_models; "
                     "init_models(); "
-                    "assert 'token_blacklist' in Base.metadata.tables; "
+                    "assert 'auth' in Base.metadata.tables; "
                     "assert 'users' in Base.metadata.tables"
                 ),
             ],
@@ -44,7 +44,7 @@ class TokenBlacklistRepositoryTests(unittest.IsolatedAsyncioTestCase):
         statement = self.session.execute.call_args.args[0]
         sql = str(statement.compile(dialect=postgresql.dialect()))
         self.assertIn("ON CONFLICT (jti) DO NOTHING", sql)
-        self.assertIn("RETURNING token_blacklist.user_id", sql)
+        self.assertIn("RETURNING auth.user_id", sql)
         self.session.flush.assert_awaited_once()
         self.session.commit.assert_not_awaited()
 

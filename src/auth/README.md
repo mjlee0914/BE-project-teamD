@@ -42,7 +42,7 @@ PyJWT는 서명과 시간 검증만 수행한다. 블랙리스트와 회원 상�
 
 `infrastructure/models.py`와 `infrastructure/repositories.py`를 구현했다.
 
-- token_blacklist는 ERD 그대로 jti TEXT 기본 키, user_id BIGINT → users.id 외래 키만 사용한다.
+- auth 테이블은 ERD 그대로 jti TEXT 기본 키, user_id BIGINT → users.id 외래 키만 사용한다.
 - user_id에 UNIQUE를 추가하지 않아 한 회원의 여러 토큰을 차단할 수 있다.
 - PostgreSQL의 ON CONFLICT DO NOTHING으로 동일 토큰의 반복·경합 등록을 처리한다.
 - 기존 jti를 다른 회원으로 덮어쓰지 않으며 소유자 충돌은 409로 전달한다.
