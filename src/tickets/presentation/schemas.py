@@ -9,11 +9,10 @@ from pydantic import BaseModel, Field
 from shared.core.schemas import ORMSchema
 from tickets.domain.enums import TicketStatus
 
-
 # 티켓 생성 요청 (POST /v1/tickets): 어느 예매의 티켓을 만들지만 받는다
 # 가격·공연 정보는 서버가 조회하고, user_id는 로그인 정보에서 꺼낸다
-class TicketCreateRequest(BaseModel):
-    reservation_id: int
+# class TicketCreateRequest(BaseModel):
+#     reservation_id: int
 
 
 # 입장 요청 (POST /v1/tickets/enter)
