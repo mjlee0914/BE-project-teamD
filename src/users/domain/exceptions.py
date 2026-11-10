@@ -81,6 +81,12 @@ class InactiveUser(ForbiddenException):
         super().__init__(message=message, error_code="INACTIVE_USER")
 
 
+# 진행 중인 예매가 있는 회원의 탈퇴 요청 (규칙 24)
+class ActiveReservationExists(ConflictException):
+    def __init__(self, message: str = "진행 중인 예매가 있어 탈퇴할 수 없습니다."):
+        super().__init__(message=message, error_code="ACTIVE_RESERVATION_EXISTS")
+
+
 # 관리자가 아닌 회원의 관리자 전용 기능 요청 (규칙 25)
 class AdminPermissionDenied(ForbiddenException):
     def __init__(self, message: str = "관리자만 이용할 수 있습니다."):
