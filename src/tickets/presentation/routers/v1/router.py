@@ -11,22 +11,21 @@
   → 반대면 "enter" 같은 글자가 ticket_id(int)로 들어가 422가 남
 """
 
+from types import SimpleNamespace
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query  # status
+from fastapi import APIRouter, Depends, Query  # , status
 
+from shared.core.actor import CurrentActor, get_current_actor
 from shared.core.exceptions import ForbiddenException
 from shared.core.schemas import APIResponse, PageResponse
 from tickets.application.service import TicketService
 from tickets.domain.enums import TicketStatus
-from tickets.presentation.dependencies import (
-    CurrentActor,
-    get_current_actor,
-    get_ticket_service,
-)
+from tickets.presentation.dependencies import get_ticket_service
 from tickets.presentation.schemas import (
     EntryStatusResponse,
     # TicketCreateRequest,
+    TicketCancelResponse,
     TicketDetailResponse,
     TicketEnterRequest,
     TicketEnterResponse,
@@ -145,10 +144,10 @@ async def get_my_ticket(
     return APIResponse.ok(data=TicketDetailResponse.model_validate(ticket))
 
 
-# 내 티켓 취소
+# 내 티켓 취소 (양일권은 토·일 한 쌍이 함께 취소되고, 응답에 취소된 티켓 id가 모두 담긴다)
 @router.patch(
     "/{ticket_id}/cancel",
-    response_model=APIResponse[TicketDetailResponse],
+    response_model=APIResponse[TicketCancelResponse],
     summary="내 티켓 취소",
 )
 async def cancel_ticket(
@@ -156,5 +155,11 @@ async def cancel_ticket(
     actor: Actor,
     service: Service,
 ):
-    ticket = await service.cancel_ticket(ticket_id, actor.user_id)
-    return APIResponse.ok(data=TicketDetailResponse.model_validate(ticket))
+    result = await service.cancel_ticket(ticket_id, actor.user_id)
+    # 티켓 필드는 그대로 읽고, 함께 취소된 id 목록만 덧붙여서 응답을 만든다
+    data = TicketCancelResponse.model_validate(
+        SimpleNamespace(
+            **vars(result.ticket), canceled_ticket_ids=result.canceled_ticket_ids
+        )
+    )
+    return APIResponse.ok(data=data)

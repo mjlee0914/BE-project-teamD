@@ -38,6 +38,12 @@ class TicketDetailResponse(ORMSchema):
     created_at: datetime | None
 
 
+# 티켓 취소 응답: 티켓 상세 + 이번 요청으로 취소된 티켓 id 목록 (양일권이면 짝 티켓 포함)
+# - 기존 응답에 필드만 하나 더한 모양이라 이미 쓰는 쪽이 깨지지 않는다
+class TicketCancelResponse(TicketDetailResponse):
+    canceled_ticket_ids: list[int]
+
+
 # 목록 항목 응답 (내 목록, 관리자 검색 공통)
 class TicketListItemResponse(ORMSchema):
     ticket_id: int = Field(validation_alias="id")
