@@ -1,7 +1,7 @@
 """
 # reservation_checker.py
 - ActiveReservationChecker 구현체 (규칙 24)
-- 예매 저장소의 exists_active_by_user로 진행 중(PENDING, CONFIRMED) 예매 여부를 확인
+- 예매 저장소의 exists_active_by_user로 진행 중(PENDING, 축제가 끝나지 않은 CONFIRMED) 예매 여부를 확인
 - 같은 세션을 써서 탈퇴 요청과 한 트랜잭션으로 처리
 
 # RepositoryActiveReservationChecker
@@ -26,7 +26,7 @@ class RepositoryActiveReservationChecker(ActiveReservationChecker):
         self._reservation_repo = reservation_repo
 
     # [진행 중 예매 여부 확인]
-    # user_id 회원에게 PENDING, CONFIRMED 예매가 하나라도 있으면 True
+    # user_id 회원에게 PENDING 예매 또는 축제가 끝나지 않은 CONFIRMED 예매가 하나라도 있으면 True
     # -> UserService.withdraw가 True를 받으면 탈퇴 거절 (규칙 24)
     # 판단 로직(어떤 상태가 '진행 중'인지)은 예매 저장소에 맡기고, 여기서는 전달만 함.
     async def has_active_reservation(self, user_id: int) -> bool:

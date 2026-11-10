@@ -43,16 +43,17 @@ domain/repository.py에서 정의한 추상 클래스를 실제 DB로 구현하�
 from datetime import datetime
 
 # 외부 라이브러리
-from sqlalchemy import exists, func, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from reservations.domain.enums import ReservationStatus
-
 # 프로젝트 코드
+from festivals.infrastructure.models import Festival
+from reservations.domain.enums import ReservationStatus
 from reservations.domain.repository import ReservationRepository
 from reservations.domain.reservation import Reservation
 from reservations.infrastructure.models import Reservation as ReservationModel
 from shared.core.enums import TicketType
+from shared.core.time import today_kst
 
 
 class SqlalchemyReservationRepository(ReservationRepository):
@@ -243,15 +244,22 @@ class SqlalchemyReservationRepository(ReservationRepository):
         models = (await self.session.scalars(stmt)).all()
         return [self._to_entity(model) for model in models]
 
-    # [작업 5] 진행 중 예매 존재 여부
-    # - 목록을 다 가져오지 않고 EXISTS로 "있다/없다"만 물어봄 → 빠름
+    # [작업 5] 진행 중 예매 존재 여부 (회원 탈퇴 검사용, 규칙 24)
+    # - PENDING: 입금 대기 중이므로 항상 진행 중
+    # - CONFIRMED: 축제가 아직 끝나지 않았을 때만 진행 중 (축제 도메인 기준: ends_on >= 오늘(KST)이면 OPEN)
     async def exists_active_by_user(self, user_id: int) -> bool:
         stmt = select(
-            exists().where(
-                ReservationModel.user_id == user_id,
-                ReservationModel.status.in_(
-                    [ReservationStatus.PENDING, ReservationStatus.CONFIRMED]
-                ),
+            exists()
+            .where(ReservationModel.user_id == user_id)
+            .where(ReservationModel.festival_id == Festival.id)
+            .where(
+                or_(
+                    ReservationModel.status == ReservationStatus.PENDING,
+                    and_(
+                        ReservationModel.status == ReservationStatus.CONFIRMED,
+                        Festival.ends_on >= today_kst(),
+                    ),
+                )
             )
         )
         return bool(await self.session.scalar(stmt))

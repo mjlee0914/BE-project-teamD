@@ -18,7 +18,7 @@
 - DB가 유출되어도 원래 비밀번호를 알 수 없음 (규칙 7)
 
 # ActiveReservationChecker
-- 회원에게 진행 중(PENDING, CONFIRMED) 예매가 있는 지 확인하는 기능 (규칙 24)
+- 회원에게 진행 중(PENDING, 축제가 끝나지 않은 CONFIRMED) 예매가 있는 지 확인하는 기능 (규칙 24)
 - 예매 데이터는 reservations 도메인 소유 -> users는 이 인터페이스만 알고 있음
 - 실제 구현은 users/infrastructure/reservation_checker.py 담당
 """
