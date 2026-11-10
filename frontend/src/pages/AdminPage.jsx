@@ -2,11 +2,10 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/endpoints";
 
-const FESTIVAL_ID = 1;
 const STATUSES = ["PENDING", "CONFIRMED", "CANCELED", "EXPIRED"];
 const TYPE_LABEL = { SAT: "토요일권", SUN: "일요일권", BOTH: "양일권" };
 
-export default function AdminPage({ version, notify, isAdmin }) {
+export default function AdminPage({ festivalId, version, notify, isAdmin }) {
   const [day, setDay] = useState("");
   const [statuses, setStatuses] = useState([]);
   const [data, setData] = useState(null);
@@ -15,7 +14,7 @@ export default function AdminPage({ version, notify, isAdmin }) {
   async function load() {
     try {
       setError(null);
-      setData(await api.festivalReservations(FESTIVAL_ID, { day: day || undefined, statuses }));
+      setData(await api.festivalReservations(festivalId, { day: day || undefined, statuses }));
     } catch (e) {
       setData(null);
       setError(`${e.status} ${e.code || ""} · ${e.message}`);
@@ -23,14 +22,14 @@ export default function AdminPage({ version, notify, isAdmin }) {
   }
   useEffect(() => {
     load();
-  }, [version, day, statuses.join(",")]);
+  }, [version, festivalId, day, statuses.join(",")]);
 
   const toggle = (s) => setStatuses((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]));
 
   return (
     <div className="page">
       <div className="page-head">
-        <h1>축제별 예매 목록</h1>
+        <h1>축제 #{festivalId} 예매 목록</h1>
         <span className={`pill ${isAdmin ? "CONFIRMED" : "CANCELED"}`}>{isAdmin ? "관리자" : "일반 회원 (403 예상)"}</span>
       </div>
 

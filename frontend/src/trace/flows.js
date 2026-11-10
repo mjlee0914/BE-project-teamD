@@ -24,18 +24,160 @@ const ENTITY = `${R}/domain/reservation.py`;
 const RULE = `${R}/domain/service.py`;
 const REPO = `${R}/infrastructure/repositories.py`;
 const PERF = "src/performances/domain/performance.py";
-const DEMO = "frontend/demo_backend/server.py";
 
+const AUTH = "src/auth";
+const AUTH_ROUTER = `${AUTH}/presentation/routers/v1/router.py`;
+const AUTH_DEPS = `${AUTH}/presentation/dependencies.py`;
+const AUTH_SERVICE = `${AUTH}/application/service.py`;
+const AUTH_VERIFIER = `${AUTH}/infrastructure/credentials_verifier.py`;
+const AUTH_JWT = `${AUTH}/infrastructure/security.py`;
+const AUTH_REPO = `${AUTH}/infrastructure/repositories.py`;
+const USER_ROUTER = "src/users/presentation/routers/v1/router.py";
+const USER_SERVICE = "src/users/application/service.py";
+const USER_ENTITY = "src/users/domain/user.py";
+const USER_REPO = "src/users/infrastructure/repositories.py";
+const FEST = "src/festivals";
+const PAY = "src/payments";
+const PAY_ROUTER = `${PAY}/presentation/routers/v1/router.py`;
+const PAY_SERVICE = `${PAY}/application/service.py`;
+const PAY_ENTITY = `${PAY}/domain/entities.py`;
+const PAY_REPO = `${PAY}/infrastructure/sqlalchemy_repository.py`;
+const PAY_ACCESS = `${PAY}/infrastructure/access_checker.py`;
+const TOSS = `${PAY}/infrastructure/toss_service.py`;
+
+// 로그인한 요청이 공통으로 지나는 곳 : Authorization 헤더의 JWT → 회원 조회 → 요청한 사람
 const authStep = {
   id: "auth",
   layer: "auth",
-  file: DEMO,
-  symbol: "demo_reservation_actor",
-  anchor: "is_admin=",
-  note: "요청한 사람 확인 (데모: 선택한 회원 / 실제: JWT 토큰 → 회원 조회)",
+  file: "src/wiring/actor.py",
+  symbol: "build_current_actor",
+  anchor: "is_admin=user.is_admin",
+  note: "Authorization 헤더의 JWT를 검증해 user_id를 꺼내고, 회원을 조회해 관리자 여부를 채워요",
 };
+// 토큰 검증 3단계 (회원·결제 API가 쓰는 get_current_user)
+const tokenSteps = [
+  { id: "token", layer: "auth", file: AUTH_DEPS, symbol: "get_current_user", anchor: "authenticate_token(token)", note: "Authorization: Bearer 헤더에서 토큰을 꺼내 검증을 맡겨요 (없으면 401)" },
+  { id: "decode", layer: "auth", file: AUTH_JWT, symbol: "JwtTokenProvider.decode_token", anchor: "jwt.decode(", note: "서명·만료·발급자·대상을 확인 → 위조되거나 만료된 토큰은 401" },
+  { id: "blacklist", layer: "auth", file: AUTH_SERVICE, symbol: "AuthService.authenticate_token", anchor: "is_blacklisted(payload.jti)", note: "로그아웃된 토큰인지, 지금도 활성 회원인지 확인" },
+];
 
 export const FLOWS = {
+  // ─────────────────────────────── 회원가입
+  "POST /v1/users": {
+    title: "회원가입",
+    steps: [
+      { id: "router", layer: "router", file: USER_ROUTER, symbol: "create_user", anchor: "service.signup(", note: "로그인 없이 호출할 수 있어요. 본문 모양이 다르면 여기 오기 전에 422" },
+      { id: "validate", layer: "domain", file: USER_ENTITY, symbol: "User.create", anchor: "_validate_password(raw_password)", note: "비밀번호 형식 검사 (영문·숫자·특수문자 포함 8자 이상) → 해시하기 전에 먼저" },
+      { id: "hash", layer: "domain", file: USER_ENTITY, symbol: "User.create", anchor: "hasher.hash(raw_password)", note: "비밀번호를 bcrypt로 해시 → DB에는 원문을 저장하지 않아요" },
+      { id: "dup", layer: "service", file: USER_SERVICE, symbol: "UserService.signup", anchor: "find_by_email(user.email)", note: "정규화된 이메일·전화번호로 중복 확인" },
+      { id: "save", layer: "repository", file: USER_REPO, symbol: "SqlAlchemyUserRepository.save", anchor: "flush()", note: "저장 → 동시에 같은 이메일로 가입해도 unique 제약이 막아요" },
+    ],
+    outcomes: {
+      201: { note: "가입 완료 → 응답에는 password_hash가 빠져 있어요" },
+      "409:EMAIL_ALREADY_EXISTS": { stopAt: "dup", anchor: "raise DuplicateEmail", note: "이미 가입된 이메일이에요" },
+      "409:PHONE_ALREADY_EXISTS": { stopAt: "dup", anchor: "raise DuplicatePhone", note: "이미 등록된 전화번호예요" },
+      "422:INVALID_PASSWORD": { stopAt: "validate", note: "비밀번호 형식이 맞지 않아요" },
+      422: { stopAt: "validate", anchor: "return cls(", note: "이메일·이름·전화번호 형식이 맞지 않아요 (__post_init__에서 검증)" },
+    },
+  },
+
+  // ─────────────────────────────── 로그인
+  "POST /v1/auth/login": {
+    title: "로그인 (JWT 발급)",
+    steps: [
+      { id: "router", layer: "router", file: AUTH_ROUTER, symbol: "login", anchor: "service.login(", note: "이메일과 비밀번호 원문을 서비스에 넘겨요 (비밀번호는 로그에 남기지 않음)" },
+      { id: "service", layer: "service", file: AUTH_SERVICE, symbol: "AuthService.login", anchor: "verify_credentials(", note: "회원 확인을 먼저 하고, 통과하면 토큰을 만들어요" },
+      { id: "find", layer: "auth", file: AUTH_VERIFIER, symbol: "RepositoryUserCredentialVerifier.verify_credentials", anchor: "find_by_email(", note: "이메일로 회원 조회" },
+      { id: "hash", layer: "auth", file: AUTH_VERIFIER, symbol: "RepositoryUserCredentialVerifier.verify_credentials", anchor: "self._password_hasher.verify", note: "입력한 비밀번호와 저장된 bcrypt 해시 비교" },
+      { id: "active", layer: "auth", file: AUTH_VERIFIER, symbol: "RepositoryUserCredentialVerifier.verify_credentials", anchor: "user.ensure_active()", note: "탈퇴한 회원이 아닌지 확인 (비밀번호가 맞은 뒤에만 상태를 알려 줌)" },
+      { id: "jwt", layer: "auth", file: AUTH_JWT, symbol: "JwtTokenProvider.create_access_token", anchor: "token = jwt.encode(", note: "회원 ID(sub)·토큰 식별자(jti)·만료 시각을 넣어 서명한 JWT 발급" },
+    ],
+    outcomes: {
+      200: { note: "토큰 발급 완료 → 이제 모든 요청의 Authorization 헤더에 이 토큰이 실려요" },
+      401: { stopAt: "hash", anchor: "if not matched", note: "이메일 또는 비밀번호가 틀렸어요 (어느 쪽이 틀렸는지는 알려 주지 않음)" },
+      403: { stopAt: "active", note: "탈퇴한 회원이에요" },
+      422: { stopAt: "router", note: "이메일 형식이 맞지 않아요" },
+    },
+  },
+
+  // ─────────────────────────────── 로그아웃
+  "POST /v1/auth/logout": {
+    title: "로그아웃 (토큰 차단)",
+    steps: [
+      { id: "router", layer: "router", file: AUTH_ROUTER, symbol: "logout", anchor: "service.logout(token)", note: "헤더의 토큰을 서비스에 넘겨요" },
+      { id: "service", layer: "service", file: AUTH_SERVICE, symbol: "AuthService.logout", anchor: "_blacklist_repo.add(", note: "JWT는 서버가 지울 수 없어서, 토큰 식별자(jti)를 차단 목록에 올려요" },
+      { id: "save", layer: "repository", file: AUTH_REPO, symbol: "SqlAlchemyTokenBlacklistRepository.add", anchor: "flush()", note: "차단 목록에 저장 → 이후 이 토큰으로 온 요청은 401" },
+    ],
+    outcomes: { 204: { note: "로그아웃 완료 → 같은 토큰은 더 이상 쓸 수 없어요" }, 401: { stopAt: "router", note: "이미 만료된 토큰이에요" } },
+  },
+
+  // ─────────────────────────────── 내 정보
+  "GET /v1/users/me": {
+    title: "내 정보 조회",
+    steps: [
+      { id: "router", layer: "router", file: USER_ROUTER, symbol: "get_user", anchor: "service.get_me(current.user_id)", note: "URL에 id가 없어요 → 토큰의 user_id만 쓰므로 남의 정보는 조회할 수 없어요" },
+      ...tokenSteps,
+      { id: "service", layer: "service", file: USER_SERVICE, symbol: "UserService.get_me", anchor: "user.ensure_active()", note: "회원 조회 후 탈퇴 여부 확인" },
+    ],
+    outcomes: { 200: { note: "내 정보 (password_hash는 응답에 없음)" }, 401: { stopAt: "decode", note: "토큰이 없거나 유효하지 않아요" } },
+  },
+  "PATCH /v1/users/me": {
+    title: "내 정보 수정",
+    steps: [
+      { id: "router", layer: "router", file: USER_ROUTER, symbol: "patch_user", anchor: "service.update_profile(", note: "수정 대상은 항상 토큰 주인 본인 (이메일·권한은 못 바꿈)" },
+      ...tokenSteps,
+      { id: "domain", layer: "domain", file: USER_ENTITY, symbol: "User.update_profile", anchor: "self._validate_name(new_name)", note: "이름·전화번호 정규화 후 형식 검증 → 통과해야 반영" },
+      { id: "dup", layer: "service", file: USER_SERVICE, symbol: "UserService.update_profile", anchor: "owner.id != user.id", note: "다른 회원이 쓰는 전화번호인지 확인 (내 번호 그대로면 통과)" },
+      { id: "save", layer: "repository", file: USER_REPO, symbol: "SqlAlchemyUserRepository.save", anchor: "flush()", note: "저장" },
+    ],
+    outcomes: {
+      200: { note: "수정 완료" },
+      409: { stopAt: "dup", anchor: "raise DuplicatePhone", note: "이미 등록된 전화번호예요" },
+      422: { stopAt: "domain", note: "이름 또는 전화번호 형식이 맞지 않아요" },
+      401: { stopAt: "decode", note: "토큰이 없거나 유효하지 않아요" },
+    },
+  },
+
+  // ─────────────────────────────── 축제 목록
+  "GET /v1/festivals": {
+    title: "축제 목록",
+    steps: [
+      { id: "router", layer: "router", file: `${FEST}/presentation/routers/v1/router.py`, symbol: "list_festivals", anchor: "service.list_festivals(page, size)", note: "page·size를 받아요 (로그인 없이 조회 가능)" },
+      { id: "service", layer: "service", file: `${FEST}/application/service.py`, symbol: "FestivalService.list_festivals", anchor: "offset = (page - 1) * size", note: "몇 개를 건너뛸지 계산" },
+      { id: "repo", layer: "repository", file: `${FEST}/infrastructure/repositories.py`, symbol: "SqlAlchemyFestivalRepository.find_all", anchor: ".offset(offset)", note: "SELECT ... OFFSET / LIMIT" },
+    ],
+    outcomes: { 200: { note: "축제 목록 + 전체 개수 → PageResponse로 응답" } },
+  },
+
+
+  // ─────────────────────────────── 결제 승인 (토스 서버 호출)
+  "POST /v1/payments/{id}/approve": {
+    title: "결제 승인 (토스페이먼츠)",
+    steps: [
+      { id: "router", layer: "router", file: PAY_ROUTER, symbol: "approve_payment", anchor: "service.approve(", note: "결제창에서 받은 paymentKey와 금액을 서비스에 넘겨요" },
+      { id: "owner", layer: "auth", file: PAY_ROUTER, symbol: "get_owned_payment", anchor: "access.ensure_owner(", note: "토큰의 회원이 이 결제의 예매 주인인지 먼저 확인" },
+      { id: "access", layer: "repository", file: PAY_ACCESS, symbol: "SQLAlchemyPaymentAccessChecker.ensure_owner", anchor: "owner_id != user_id", note: "예매의 user_id와 비교 → 남의 결제면 403" },
+      { id: "lock", layer: "service", file: PAY_SERVICE, symbol: "PaymentService.approve", anchor: "lock_reservation(", note: "예매 행을 잠가요 → 같은 예매의 결제 요청이 동시에 와도 하나씩 처리" },
+      { id: "for_update", layer: "repository", file: PAY_REPO, symbol: "SQLAlchemyPaymentRepository.lock_reservation", anchor: "with_for_update()", note: "SELECT ... FOR UPDATE" },
+      { id: "check", layer: "domain", file: PAY_ENTITY, symbol: "Payment.ensure_approvable", anchor: "amount != self.amount", note: "브라우저가 보낸 금액이 서버에 저장된 금액과 같은지 확인 (금액 조작 방지)" },
+      { id: "start", layer: "domain", file: PAY_ENTITY, symbol: "Payment.start_approval", anchor: "PaymentStatus.IN_PROGRESS", note: "승인 진행 중(IN_PROGRESS)으로 먼저 기록 → 결과가 불분명해도 흔적이 남아요" },
+      { id: "call", layer: "service", file: PAY_SERVICE, symbol: "PaymentService.approve", anchor: "self.processor.approve(", note: "여기서 토스 서버로 HTTP 요청이 나가요" },
+      { id: "toss", layer: "external", file: TOSS, symbol: "TossPaymentProcessor.approve", anchor: '"/confirm"', note: "POST https://api.tosspayments.com/v1/payments/confirm (paymentKey + 서버가 보관한 주문번호·금액)" },
+      { id: "verify", layer: "external", file: TOSS, symbol: "TossPaymentProcessor.approve", anchor: 'data.get("paymentKey") != payment_key', note: "토스 응답의 결제 키·주문번호·금액이 보낸 값과 같은지 다시 확인" },
+      { id: "apply", layer: "domain", file: PAY_ENTITY, symbol: "Payment.approve", anchor: "self.status = status", note: "가상계좌 = 입금 대기(WAITING_FOR_DEPOSIT), 카드 = 결제 완료(DONE)" },
+      { id: "save", layer: "repository", file: PAY_REPO, symbol: "SQLAlchemyPaymentRepository.save", anchor: "_apply_changes(model, payment)", note: "승인 결과 저장" },
+    ],
+    outcomes: {
+      200: { note: "승인 완료 → 가상계좌는 입금을 기다리고, 카드는 바로 결제 완료예요" },
+      502: { stopAt: "toss", note: "토스 서버가 승인을 거절했거나 응답을 확인하지 못했어요 (진행 기록은 남김)" },
+      403: { stopAt: "access", anchor: "raise ForbiddenException", note: "본인의 예매에 연결된 결제만 승인할 수 있어요" },
+      404: { stopAt: "owner", note: "결제를 찾을 수 없어요" },
+      409: { stopAt: "start", note: "같은 예매에 이미 진행 중이거나 완료된 결제가 있어요" },
+      422: { stopAt: "check", anchor: "raise InvalidAmountException", note: "금액이 서버에 저장된 값과 다르거나 승인할 수 없는 상태예요" },
+      401: { stopAt: "owner", note: "로그인이 필요해요" },
+    },
+  },
+
   // ─────────────────────────────── 예매 생성
   "POST /v1/reservations": {
     title: "예매 생성",
@@ -95,34 +237,7 @@ export const FLOWS = {
     },
   },
 
-  // ─────────────────────────────── 입금 완료 시뮬레이션 → 확정 + 티켓 발급
-  "POST /demo/reservations/{id}/confirm": {
-    title: "입금 완료 → 예매 확정 (결제 웹훅 시뮬레이션)",
-    steps: [
-      { id: "demo", layer: "demo", file: DEMO, symbol: "demo_confirm", anchor: "confirm_reservation(", note: "실제로는 결제 웹훅이 DONE을 받은 뒤 이 메서드를 호출해야 해요 (결제 담당 연동 예정)" },
-      { id: "lock", layer: "service", file: SERVICE, symbol: "ReservationService.confirm_reservation", anchor: "_reservation_repo.lock(", note: "예매 행 잠금 → 만료 작업(skip_locked)이 이 예매를 건너뛰어요" },
-      { id: "idempotent", layer: "service", file: SERVICE, symbol: "ReservationService.confirm_reservation", anchor: "return reservation", note: "이미 확정이면 그대로 성공 (웹훅이 두 번 와도 안전)" },
-      { id: "confirm", layer: "domain", file: ENTITY, symbol: "Reservation.confirm", anchor: "ReservationStatus.CONFIRMED", note: "PENDING이고 입금 기한 안이어야 CONFIRMED" },
-      { id: "issue", layer: "service", file: SERVICE, symbol: "ReservationService._issue_tickets", anchor: "ticket.confirm(now)", note: "회차 × 수량만큼 티켓 발급 (양일권 2장 = 4장)" },
-    ],
-    outcomes: {
-      200: { note: "확정 + 티켓 발급 → 같은 트랜잭션이라 발급이 실패하면 확정도 취소돼요" },
-      409: { stopAt: "confirm", anchor: "raise", note: "PENDING이 아니거나 입금 기한이 지난 예매는 확정할 수 없어요" },
-    },
-  },
 
-  // ─────────────────────────────── 만료 작업
-  "POST /demo/reservations/{id}/expire": {
-    title: "입금 기한 만료 (백그라운드 작업 1회 실행)",
-    badge: "⏱ 서버에서는 1분마다 자동 실행",
-    steps: [
-      { id: "job", layer: "demo", file: "src/reservations/infrastructure/expire_job.py", symbol: "_loop", anchor: "run_expire_once()", note: "서버가 켜져 있는 동안 1분마다 돌아요 (데모에서는 버튼으로 1회 실행)" },
-      { id: "find", layer: "repository", file: REPO, symbol: "SqlalchemyReservationRepository.find_overdue_pending", anchor: "skip_locked=True", note: "기한 지난 PENDING만 조회, 결제 확정 중(잠긴) 예매는 건너뜀" },
-      { id: "expire", layer: "domain", file: ENTITY, symbol: "Reservation.expire", anchor: "ReservationStatus.EXPIRED", note: "PENDING → EXPIRED" },
-      { id: "restore", layer: "service", file: SERVICE, symbol: "ReservationService._restore_remaining", anchor: "increase_remaining", note: "묶여 있던 좌석 반납" },
-    ],
-    outcomes: { 200: { note: "만료 처리 완료 → 좌석이 다시 예매 가능해져요" } },
-  },
 
   // ─────────────────────────────── 관리자 목록
   "GET /v1/festivals/{id}/reservations": {
