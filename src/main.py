@@ -30,8 +30,8 @@ from shared.core.exception_handlers import register_exception_handlers
 from tickets.presentation.routers.v1.router import router as ticket_router
 from users.presentation.routers.v1.router import router as user_router
 
-from auth.presentation.routers.v1.router import router as auth_router
-from payments.presentation.routers.v1.router import router as payment_router
+# from auth.presentation.routers.v1.router import router as auth_router
+# from payments.presentation.routers.v1.router import router as payment_router
 from wiring import wire_dependencies
 
 
