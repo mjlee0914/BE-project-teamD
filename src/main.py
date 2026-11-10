@@ -10,10 +10,14 @@ FastAPI 앱의 시작점
 4. 도메인별 라우터 등록
 """
 
+# 표준 라이브러리
+from contextlib import asynccontextmanager
+
 # 외부 라이브러리
 from fastapi import FastAPI
 
 # 프로젝트 코드
+from reservations.infrastructure.expire_job import start_expire_job
 from reservations.presentation.routers.v1.router import (
     admin_router as reservation_admin_router,
 )
@@ -29,7 +33,19 @@ from tickets.presentation.routers.v1.router import router as ticket_router
 # from payments.presentation.routers.v1.router import router as payment_router
 from wiring import wire_dependencies
 
-app = FastAPI()
+
+
+# 서버 시작·종료 시 할 일
+# - 시작 : 입금 기한 지난 예매를 만료시키는 주기 작업 실행 (#134)
+# - 종료 : 주기 작업 멈추기
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    expire_task = start_expire_job()
+    yield
+    expire_task.cancel()
+
+
+app = FastAPI(lifespan=lifespan)
 
 # 전역 예외 핸들러 등록
 # 이후 모든 API에서 발생한 예외가 APIResponse.fail() 형식으로 응답됨

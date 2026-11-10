@@ -39,8 +39,11 @@ domain/repository.py에서 정의한 추상 클래스를 실제 DB로 구현하�
 - scalar는 결과 중 첫 번째 하나 / scalars는 결과 여러개, all()은 리스트로 반환
 """
 
+# 표준 라이브러리
+from datetime import datetime
+
 # 외부 라이브러리
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from reservations.domain.enums import ReservationStatus
@@ -193,3 +196,31 @@ class SqlalchemyReservationRepository(ReservationRepository):
 
         result = await self.session.execute(stmt)
         return result.scalar_one()
+
+    # [작업 3] 입금 기한이 지난 PENDING 예매 조회
+    # - with_for_update(skip_locked=True) : 결제 확정이 같은 예매를 잡고 있으면 이번엔 건너뜀
+    #   → 입금 확정과 만료가 동시에 일어나 상태가 꼬이는 것을 막는다 (다음 주기에 다시 검사)
+    async def find_overdue_pending(self, now: datetime) -> list[Reservation]:
+        stmt = (
+            select(ReservationModel)
+            .where(
+                ReservationModel.status == ReservationStatus.PENDING,
+                ReservationModel.expires_at < now,
+            )
+            .with_for_update(skip_locked=True)
+        )
+        models = (await self.session.scalars(stmt)).all()
+        return [self._to_entity(model) for model in models]
+
+    # [작업 5] 진행 중 예매 존재 여부
+    # - 목록을 다 가져오지 않고 EXISTS로 "있다/없다"만 물어봄 → 빠름
+    async def exists_active_by_user(self, user_id: int) -> bool:
+        stmt = select(
+            exists().where(
+                ReservationModel.user_id == user_id,
+                ReservationModel.status.in_(
+                    [ReservationStatus.PENDING, ReservationStatus.CONFIRMED]
+                ),
+            )
+        )
+        return bool(await self.session.scalar(stmt))

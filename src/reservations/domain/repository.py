@@ -13,6 +13,7 @@ Abstract Base Classes ( 추상 기본 클래스 )
 
 # 파이썬 기본 라이브러리
 from abc import ABC, abstractmethod
+from datetime import datetime
 
 from reservations.domain.enums import ReservationStatus
 
@@ -55,3 +56,13 @@ class ReservationRepository(ABC):
         statuses: list[ReservationStatus] | None,
     ) -> int:
         """축제별 예매 전체 개수"""
+
+    # [작업 3] 입금 기한이 지난 PENDING 예매 목록 (만료 처리 대상)
+    @abstractmethod
+    async def find_overdue_pending(self, now: datetime) -> list[Reservation]:
+        """입금 기한(expires_at)이 now보다 이전인 PENDING 예매 목록"""
+
+    # [작업 5] 진행 중(PENDING·CONFIRMED) 예매가 하나라도 있는지 (회원 탈퇴 검사용)
+    @abstractmethod
+    async def exists_active_by_user(self, user_id: int) -> bool:
+        """사용자에게 PENDING 또는 CONFIRMED 예매가 있으면 True"""

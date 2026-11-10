@@ -12,11 +12,19 @@
 - cancel_reservation          예매 취소 (본인: 취소 마감까지 / 관리자: 공연 시작 전까지)
 [관리자] #117
 - list_festival_reservations  축제별 예매 목록 (티켓 종류·상태 필터 + 페이지)
+[다른 도메인·작업이 호출]
+- confirm_reservation         입금 완료 → CONFIRMED   (작업 2, 결제가 호출)
+- expire_overdue              입금 기한 지난 예매 만료 (작업 3, 주기 작업이 호출)
+- cancel_by_performance       공연 취소 → 예매 일괄 취소 (작업 4, 공연 서비스가 호출, #131)
+- has_active_reservation      진행 중 예매가 있는지  (작업 5, 회원 탈퇴가 호출)
 
 # commit은 여기서 하지 않는다
 - 저장소는 flush까지만 하고, commit은 요청 단위 세션(get_db)에서 처리
 - 중간에 예외가 나면 세션이 rollback 되므로 잔여 수량 변경도 함께 취소됨
 """
+
+# 표준 라이브러리
+from datetime import datetime
 
 # 축제 도메인
 from festivals.domain.enums import FestivalStatus
@@ -44,6 +52,9 @@ from reservations.domain.service import check_daily_limit
 # 공통
 from shared.core.enums import TicketType
 from shared.core.time import KST, now_utc, today_kst
+
+# 진행 중인 예매 상태 : 공연 취소 시 일괄 취소 대상
+ACTIVE_STATUSES = [ReservationStatus.PENDING, ReservationStatus.CONFIRMED]
 
 # 잔여 수량을 되돌릴 수 있는 공연 상태
 # - 취소·종료된 공연은 공연 엔티티가 복구를 거부(409)하므로 미리 걸러서 건너뛴다
@@ -253,3 +264,59 @@ class ReservationService:
             festival_id, ticket_types, statuses
         )
         return items, total
+
+    # ------------------------------------------------------------------
+    # 다른 도메인·작업이 호출하는 유스케이스
+    # ------------------------------------------------------------------
+
+    # [작업 2] 입금 완료 → 예매 확정
+    # - 결제 쪽이 입금 확인(웹훅)에 성공했을 때 "같은 세션"으로 호출해야 함
+    # - 입금 기한이 지났거나 PENDING이 아니면 엔티티가 409를 던짐
+    async def confirm_reservation(self, reservation_id: int) -> Reservation:
+        reservation = await self._reservation_repo.find_by_id(reservation_id)
+        if reservation is None:
+            raise ReservationNotFound()
+        reservation.confirm(now_utc())
+        return await self._reservation_repo.save(reservation)
+
+    # [작업 3] 입금 기한 지난 예매 만료
+    # - 주기 작업(reservations/infrastructure/expire_job.py)이 몇 분마다 호출
+    # - 만료한 예매 수를 돌려줌 (로그용)
+    async def expire_overdue(self, now: datetime | None = None) -> int:
+        now = now or now_utc()
+        overdue = await self._reservation_repo.find_overdue_pending(now)
+        for reservation in overdue:
+            reservation.expire(now)
+            await self._restore_remaining(reservation)
+            await self._reservation_repo.save(reservation)
+        return len(overdue)
+
+    # [작업 4] 공연 취소 → 관련 예매 일괄 취소 (#131, B안)
+    # - 공연 서비스가 공연을 CANCELED로 "저장한 뒤" 같은 세션으로 호출
+    # - 토요일 공연 취소 → SAT + BOTH 예매, 일요일 → SUN + BOTH
+    # - 양일권은 부분 취소 없이 전체 취소, 남은 요일 수량만 복구 (_restore_remaining이 처리)
+    # - 사용자 취소 마감과 상관없이 취소 (관리자 결정이므로)
+    async def cancel_by_performance(self, performance: Performance) -> int:
+        weekday = performance.starts_at.astimezone(KST).weekday()
+        day = TicketType.SAT if weekday == 5 else TicketType.SUN
+        ticket_types = [day, TicketType.BOTH]
+
+        total = await self._reservation_repo.count_festival_reservation(
+            performance.festival_id, ticket_types, ACTIVE_STATUSES
+        )
+        if total == 0:
+            return 0
+        targets = await self._reservation_repo.find_festival_reservation(
+            performance.festival_id, ticket_types, ACTIVE_STATUSES, 0, total
+        )
+
+        now = now_utc()
+        for reservation in targets:
+            reservation.cancel(now)
+            await self._restore_remaining(reservation)
+            await self._reservation_repo.save(reservation)
+        return len(targets)
+
+    # [작업 5] 진행 중 예매 여부 (회원 탈퇴 검사용)
+    async def has_active_reservation(self, user_id: int) -> bool:
+        return await self._reservation_repo.exists_active_by_user(user_id)
