@@ -117,6 +117,15 @@ class SqlAlchemyTicketRepository(
         model = result.scalar_one_or_none()
         return None if model is None else _to_domain(model)
 
+    async def find_all_by_reservation(self, reservation_id: int) -> list[Ticket]:
+        stmt = (
+            select(TicketModel)
+            .where(TicketModel.reservation_id == reservation_id)
+            .order_by(TicketModel.id)
+        )
+        models = (await self._session.scalars(stmt)).all()
+        return [_to_domain(model) for model in models]
+
     async def count_by_reservation_id(self, reservation_id: int) -> int:
         stmt = (
             select(

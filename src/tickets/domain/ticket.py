@@ -112,6 +112,16 @@ class Ticket:
         self.status = TicketStatus.CANCELED
         self.canceled_at = now
 
+    # 관리자·시스템 취소 pending/issued -> canceled (#134)
+    # - 예매 취소·공연 취소로 티켓을 함께 취소할 때 사용
+    # - 취소 마감(cancel_deadline_at)은 보지 않음 : 마감 판단은 예매 쪽에서 이미 끝냈기 때문
+    def force_cancel(self, now: datetime) -> None:
+        _require_aware(now)
+        if self.status in FINAL_STATUSES:
+            raise TicketNotCancelable("이미 처리가 끝난 티켓은 취소할 수 없습니다.")
+        self.status = TicketStatus.CANCELED
+        self.canceled_at = now
+
     # 입장 issued -> used
     def enter(self, now: datetime) -> None:
         _require_aware(now)
