@@ -13,17 +13,14 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query  # status
+from fastapi import APIRouter, Depends, Query  # , status
 
+from shared.core.actor import CurrentActor, get_current_actor
 from shared.core.exceptions import ForbiddenException
 from shared.core.schemas import APIResponse, PageResponse
 from tickets.application.service import TicketService
 from tickets.domain.enums import TicketStatus
-from tickets.presentation.dependencies import (
-    CurrentActor,
-    get_current_actor,
-    get_ticket_service,
-)
+from tickets.presentation.dependencies import get_ticket_service
 from tickets.presentation.schemas import (
     EntryStatusResponse,
     # TicketCreateRequest,
