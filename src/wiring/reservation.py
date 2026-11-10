@@ -10,6 +10,8 @@
 """
 
 # 외부 라이브러리
+from typing import Annotated
+
 from fastapi import Depends, FastAPI
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,7 +29,7 @@ from tickets.infrastructure.repositories import SqlAlchemyTicketRepository
 
 # 예매 서비스 조립 (저장소 4개에 "같은 세션" → 한 트랜잭션)
 def build_reservation_service(
-    session: AsyncSession = Depends(get_db),
+    session: Annotated[AsyncSession, Depends(get_db)],
 ) -> ReservationService:
     return ReservationService(
         reservation_repo=SqlalchemyReservationRepository(session),
