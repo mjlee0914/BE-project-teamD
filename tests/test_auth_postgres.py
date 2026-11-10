@@ -250,7 +250,7 @@ class TokenBlacklistPostgresTests(unittest.IsolatedAsyncioTestCase):
             get_current_user,
             provide_auth_service,
         )
-        from auth.presentation.router import router
+        from auth.presentation.routers.v1.router import router
         from shared.core.exception_handlers import register_exception_handlers
 
         hasher = BcryptPasswordHasher(rounds=4)

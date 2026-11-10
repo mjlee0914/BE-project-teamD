@@ -11,7 +11,7 @@ from auth.domain.repository import TokenBlacklistRepository
 from auth.domain.service import UserCredentialVerifier, UserStatusChecker
 from auth.infrastructure.security import JwtTokenProvider
 from auth.presentation.dependencies import get_current_user, provide_auth_service
-from auth.presentation.router import router
+from auth.presentation.routers.v1.router import router
 from auth.presentation.schemas import LoginRequest
 from shared.core.exception_handlers import register_exception_handlers
 from shared.core.exceptions import UnauthorizedException

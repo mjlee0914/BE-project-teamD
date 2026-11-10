@@ -22,7 +22,10 @@ from payments.domain.exceptions import (
 )
 from payments.domain.repository import PaymentRepository
 from payments.domain.service import PaymentProcessor, PaymentSnapshot
-from payments.presentation.webhook_router import provide_deposit_webhook_service, router
+from payments.presentation.routers.v1.webhook_router import (
+    provide_deposit_webhook_service,
+    router,
+)
 from shared.core.exceptions import SharedException
 
 

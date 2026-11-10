@@ -13,7 +13,9 @@ from payments.presentation.dependencies import (
     provide_payment_access_checker,
     provide_payment_service,
 )
-from payments.presentation.webhook_router import provide_deposit_webhook_service
+from payments.presentation.routers.v1.webhook_router import (
+    provide_deposit_webhook_service,
+)
 from shared.core.database import get_db
 
 
