@@ -32,21 +32,24 @@ from reservations.presentation.routers.v1.router import (
 )
 from reservations.presentation.routers.v1.router import router as reservation_router
 from shared.core.exception_handlers import register_exception_handlers
+from tickets.infrastructure.expire_job import start_ticket_expire_job
 from tickets.presentation.routers.v1.router import router as ticket_router
 from users.presentation.routers.v1.router import router as user_router
 from wiring import wire_dependencies
 
 
 # 서버 시작·종료 시 할 일
-# - 시작 : 입금 기한 지난 예매를 만료시키는 주기 작업 실행 (#134)
+# - 시작 : 입금 기한 지난 예매를 만료시키는 주기 작업 (#134), 공연이 끝난 티켓을 만료시키는 주기 작업 (#146)
 # - 종료 : 주기 작업 멈추기
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     expire_task = start_expire_job()
+    ticket_expire_task = start_ticket_expire_job()
     yield
-    expire_task.cancel()
-    with suppress(asyncio.CancelledError):
-        await expire_task
+    for task in (expire_task, ticket_expire_task):
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
 
 
 app = FastAPI(lifespan=lifespan)

@@ -288,3 +288,18 @@ class TicketService:
         if all_canceled and reservation.status == ReservationStatus.CONFIRMED:
             reservation.cancel(now)
             await self._reservation_repo.save(reservation)
+
+    # --- 만료 ---
+
+    # 공연이 끝난 티켓을 EXPIRED로 변경 (주기 작업이 호출)
+    # - 취소(CANCELED)된 티켓을 뺀 모든 티켓이 대상이다 (입장을 했든 안 했든 같다)
+    # - 만료한 수를 돌려준다 (로그용)
+    # - 잔여 수량·예매 상태는 건드리지 않는다 (종료된 공연은 복구하지 않음)
+    # - Ticket.expire가 "공연 종료 후이고 CANCELED·EXPIRED가 아닌지" 다시 검사한다
+    async def expire_overdue(self, now: datetime | None = None) -> int:
+        now = now or now_utc()
+        tickets = await self._ticket_repo.find_all_to_expire(now)
+        for ticket in tickets:
+            ticket.expire(now)
+            await self._ticket_repo.save(ticket)
+        return len(tickets)

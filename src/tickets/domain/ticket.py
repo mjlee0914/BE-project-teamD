@@ -22,8 +22,9 @@
 7. 예매가 확정되면 PENDING → ISSUED, issued_at을 기록한다.
 8. 취소하면 PENDING/ISSUED → CANCELED, canceled_at을 기록한다. 취소 마감 시각이 지나면 취소할 수 없다.
 9. 입장하면 ISSUED → USED, used_at을 기록한다.
-10. 공연 종료 후 미사용이면 ISSUED → EXPIRED.
-11. CANCELED, USED, EXPIRED는 끝난 상태라 다른 상태로 바꿀 수 없다.
+10. 공연이 끝나면(종료 시각이 지나면) 취소된 티켓을 뺀 모든 티켓(PENDING/ISSUED/USED)이 EXPIRED가 된다.
+    입장 여부와 상관없이 같고, used_at 등 기록은 그대로 둔다.
+11. CANCELED, EXPIRED는 끝난 상태라 다른 상태로 바꿀 수 없다. (USED는 공연이 끝나면 EXPIRED로 바뀐다)
 """
 
 from dataclasses import dataclass, field  # 엔티티 반복 코드 줄여주는 도구
@@ -137,11 +138,14 @@ class Ticket:
         self.status = TicketStatus.USED
         self.used_at = now
 
-    # 만료 issued -> expired
+    # 만료: 공연이 끝나면 취소(CANCELED)된 티켓을 뺀 모든 티켓이 EXPIRED가 된다
+    # - 입장을 했든(USED) 안 했든(ISSUED) 같다. used_at 등 기록은 그대로 둔다
     def expire(self, now: datetime) -> None:
         _require_aware(now)
-        if self.status != TicketStatus.ISSUED:
-            raise InvalidTicketStatus("발급된 티켓만 만료 처리할 수 있습니다.")
+        if self.status in (TicketStatus.CANCELED, TicketStatus.EXPIRED):
+            raise InvalidTicketStatus(
+                "취소됐거나 이미 만료된 티켓은 만료 처리할 수 없습니다."
+            )
         if now < self.performance_end_at:
             raise InvalidTicketStatus("공연이 끝난 뒤에 만료 처리할 수 있습니다.")
         self.status = TicketStatus.EXPIRED
