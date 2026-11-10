@@ -46,7 +46,8 @@ class ReservationResponse(BaseModel):
     discount_amount: int  # 할인 금액
     final_price: int  # 최종 결제 금액 (총 금액 - 할인 금액)
     status: str  # 예매 상태 : PENDING / CONFIRMED / EXPIRED / CANCELED
-    expires_at: datetime  # 입금 기한
+    expires_at: datetime  # 입금 기한 (예매 만료 시각)
+    deposit_due_at: datetime  # 가상계좌 입금 마감 (= expires_at - 5분, 결제창 dueDate에 사용)
     created_at: datetime  # 예매 생성 시각
     confirmed_at: datetime | None = None  # 입금 확인 시각 (확인 전이면 None)
     canceled_at: datetime | None = None  # 취소 시각 (취소 전이면 None)

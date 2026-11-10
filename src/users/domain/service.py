@@ -16,6 +16,11 @@
 - 평문 -> 해시는 가능하지만, 해시 -> 평문으로 되돌리기 불가능
 - 로그인할 때는 "복호화"가 아닌 입력값을 다시 해시해서 비교(verify)함
 - DB가 유출되어도 원래 비밀번호를 알 수 없음 (규칙 7)
+
+# ActiveReservationChecker
+- 회원에게 진행 중(PENDING, 축제가 끝나지 않은 CONFIRMED) 예매가 있는 지 확인하는 기능 (규칙 24)
+- 예매 데이터는 reservations 도메인 소유 -> users는 이 인터페이스만 알고 있음
+- 실제 구현은 users/infrastructure/reservation_checker.py 담당
 """
 
 from abc import ABC, abstractmethod
@@ -31,3 +36,8 @@ class PasswordHasher(ABC):
     def verify(self, raw_password: str, hashed_password: str) -> bool:
         """평문 비밀번호가 기존 해시값과 일치하는 검증"""
         # 일치하면 True, 아니면 False
+
+class ActiveReservationChecker(ABC):
+    @abstractmethod
+    async def has_active_reservation(self, user_id: int) -> bool:
+        """진행 중 예매가 하나라도 있으면 True"""

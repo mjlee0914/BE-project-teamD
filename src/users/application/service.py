@@ -16,13 +16,18 @@
 
 # users/domain/exceptions.py
 from shared.core.time import now_utc
-from users.domain.exceptions import DuplicateEmail, DuplicatePhone, UserNotFound
+from users.domain.exceptions import (
+    ActiveReservationExists,
+    DuplicateEmail,
+    DuplicatePhone,
+    UserNotFound,
+)
 
 # users/domain/repository.py
 from users.domain.repository import UserRepository
 
 # users/domain/service.py
-from users.domain.service import PasswordHasher
+from users.domain.service import ActiveReservationChecker, PasswordHasher
 
 # users/domain/user.py
 from users.domain.user import User
@@ -32,9 +37,15 @@ from users.domain.user import User
 # router는 이 클래스만 호출하고, 실제 객체는 wiring(src/wiring/user.py)에서 저장소·해셔를 넣어 만든다
 class UserService:
     # 저장소와 해셔를 밖에서 받음 (타입은 domain 인터페이스)
-    def __init__(self, user_repo: UserRepository, hasher: PasswordHasher) -> None:
+    def __init__(
+        self,
+        user_repo: UserRepository,
+        hasher: PasswordHasher,
+        reservation_checker: ActiveReservationChecker,
+    ) -> None:
         self._user_repo = user_repo
         self._hasher = hasher
+        self._reservation_checker = reservation_checker
 
     # [회원가입]
     async def signup(
@@ -123,10 +134,13 @@ class UserService:
         # [1] 대상, 요청자 조회: 없으면 404
         target = await self._get_user(target_user_id)
         requester = await self._get_user(requester_id)
-        # TODO: 규칙 24(진행 중인 예매가 있으면 탈퇴 불가) → 예매 도메인 조회 방법이 정해지면 여기서 확인
         # [2] 도메인 규칙 실행: 이미 탈퇴 409, 본인·ADMIN이 아니면 403 (규칙 15, 16)
         target.withdraw(requester=requester, now=now_utc())
-        # [3] 저장: 행은 남기고 status=WITHDRAWN, deleted_at만 기록 (규칙 17)
+        # [3] 진행 중 예매 확인: 있으면 409 (규칙 24)
+        # 위에서 바뀐 상태는 아직 저장 전 -> 예외가 나면 save 없이 끝나고 get_db가 rollback
+        if await self._reservation_checker.has_active_reservation(target.id):
+            raise ActiveReservationExists()
+        # [4] 저장: 행은 남기고 status=WITHDRAWN, deleted_at만 기록 (규칙 17)
         await self._user_repo.save(target)
 
     # [회원 조회 공통 처리]
