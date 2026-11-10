@@ -32,12 +32,19 @@ from reservations.presentation.dependencies import (
 from reservations.presentation.schemas import ReservationCreate, ReservationResponse
 from shared.core.enums import TicketType
 from shared.core.schemas import APIResponse, PageResponse
+from users.domain.exceptions import AdminPermissionDenied
 
 router = APIRouter(prefix="/v1/reservations", tags=["reservations"])
 
 # 관리자 목록은 주소가 /v1/festivals/... 로 시작해서 prefix가 다른 라우터를 하나 더 둠
 # → main.py에서 include_router(reservation_admin_router)를 추가해야 함
 admin_router = APIRouter(prefix="/v1/festivals", tags=["reservations-admin"])
+
+
+# 관리자 검사 (티켓 라우터와 같은 방식 : 관리자 전용 API는 라우터에서 막음)
+def _require_admin(actor: CurrentActor) -> None:
+    if not actor.is_admin:
+        raise AdminPermissionDenied()
 
 
 # 예매 생성 (201)
@@ -138,9 +145,9 @@ async def list_festival_reservations(
     service: ReservationService = Depends(provide_reservation_service),
     actor: CurrentActor = Depends(get_current_actor),
 ):
+    _require_admin(actor)
     items, total = await service.list_festival_reservations(
         festival_id=festival_id,
-        is_admin=actor.is_admin,
         day=day,
         statuses=statuses,
         page=page,
