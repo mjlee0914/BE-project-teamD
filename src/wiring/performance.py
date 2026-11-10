@@ -10,6 +10,7 @@ from performances.presentation.dependencies import get_performance_service
 from reservations.application.service import ReservationService
 from reservations.infrastructure.repositories import SqlalchemyReservationRepository
 from shared.core.database import get_db
+from tickets.infrastructure.repositories import SqlAlchemyTicketRepository
 
 
 def build_performance_service(
@@ -22,6 +23,7 @@ def build_performance_service(
             reservation_repo=SqlalchemyReservationRepository(session),
             festival_repo=SqlAlchemyFestivalRepository(session),
             performance_repo=SqlAlchemyPerformanceRepository(session),
+            ticket_repo=SqlAlchemyTicketRepository(session),
             )
     )
 
