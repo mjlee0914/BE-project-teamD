@@ -24,20 +24,38 @@ from reservations.presentation.dependencies import (
     provide_reservation_service,
 )
 from shared.core.database import get_db
+from tickets.application.service import TicketService
 from tickets.infrastructure.repositories import SqlAlchemyTicketRepository
 
 
 # 예매 서비스 조립 (저장소 4개에 "같은 세션" → 한 트랜잭션)
+# def build_reservation_service(
+#     session: AsyncSession = Depends(get_db),
+# ) -> ReservationService:
+#     return ReservationService(
+#         reservation_repo=SqlalchemyReservationRepository(session),
+#         festival_repo=SqlAlchemyFestivalRepository(session),
+#         performance_repo=SqlAlchemyPerformanceRepository(session),
+#         ticket_repo=SqlAlchemyTicketRepository(session),
+#     )
 def build_reservation_service(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> ReservationService:
+    reservation_repo = SqlalchemyReservationRepository(session)
+    performance_repo = SqlAlchemyPerformanceRepository(session)
+    ticket_repo = SqlAlchemyTicketRepository(session)
     return ReservationService(
-        reservation_repo=SqlalchemyReservationRepository(session),
+        reservation_repo=reservation_repo,
         festival_repo=SqlAlchemyFestivalRepository(session),
-        performance_repo=SqlAlchemyPerformanceRepository(session),
-        ticket_repo=SqlAlchemyTicketRepository(session),
+        performance_repo=performance_repo,
+        ticket_repo=ticket_repo,
+        # 티켓 취소·잔여 수량 복구를 맡기는 티켓 서비스 (같은 세션 → 한 트랜잭션)
+        ticket_service=TicketService(
+            ticket_repo=ticket_repo,
+            reservation_repo=reservation_repo,
+            performance_repo=performance_repo,
+        ),
     )
-
 
 # 의존성 교체 등록 (괄호 없이 함수 자체를 넘김)
 def wire_reservation_dependencies(app: FastAPI) -> None:

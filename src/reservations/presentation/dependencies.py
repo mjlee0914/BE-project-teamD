@@ -12,4 +12,3 @@ from reservations.application.service import ReservationService
 # 예매 서비스 제공 → wiring의 build_reservation_service로 교체됨
 def provide_reservation_service() -> ReservationService:
     raise NotImplementedError("reservation_service 의존성이 주입되지 않았습니다.")
-

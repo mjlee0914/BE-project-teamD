@@ -36,11 +36,11 @@ class TicketRepository(ABC):
     async def find_all_by_reservation(self, reservation_id: int) -> list[Ticket]:
         """예매에 발급된 티켓 전체를 반환한다."""
 
-    # 중복 발급 동시성 방지
-    # "개수 세기 → 0이면 생성"은 두 요청이 동시에 오면 둘 다 0을 보고 통과한다.
-    # 그래서 검사 전에 예매 행을 잠가서, 같은 예매의 발급 요청이 한 줄로 서게 한다.
-    # @abstractmethod
-    # async def lock_reservation(self, reservation_id: int, user_id: int) -> None:
+        # 중복 발급 동시성 방지
+        # "개수 세기 → 0이면 생성"은 두 요청이 동시에 오면 둘 다 0을 보고 통과한다.
+        # 그래서 검사 전에 예매 행을 잠가서, 같은 예매의 발급 요청이 한 줄로 서게 한다.
+        # @abstractmethod
+        # async def lock_reservation(self, reservation_id: int, user_id: int) -> None:
         """본인 예매 행을 잠근다 (요청이 commit/rollback될 때까지 유지).
         없거나 남의 예매면 아무것도 잠그지 않는다."""
 

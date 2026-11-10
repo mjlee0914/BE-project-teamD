@@ -13,7 +13,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query  #status
+from fastapi import APIRouter, Depends, Query  # status
 
 from shared.core.exceptions import ForbiddenException
 from shared.core.schemas import APIResponse, PageResponse
@@ -26,7 +26,7 @@ from tickets.presentation.dependencies import (
 )
 from tickets.presentation.schemas import (
     EntryStatusResponse,
-    #TicketCreateRequest,
+    # TicketCreateRequest,
     TicketDetailResponse,
     TicketEnterRequest,
     TicketEnterResponse,
