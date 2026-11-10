@@ -222,9 +222,10 @@ class TicketService:
         if ticket_type != TicketType.BOTH:
             return [clicked]
 
-        # 회차별 티켓 묶음: {회차 id: [티켓, ...]} (발급 순서 유지)
+        # 회차별 티켓 묶음: {회차 id: [티켓, ...]}
+        # id 순으로 직접 정렬: 저장소의 정렬에 기대지 않는다 (id 순서 = 발급 순서)
         by_performance: dict[int, list[Ticket]] = {}
-        for t in siblings:
+        for t in sorted(siblings, key=lambda t: t.id):
             by_performance.setdefault(t.performance_id, []).append(t)
 
         # 누른 티켓이 자기 회차 안에서 몇 번째인지
