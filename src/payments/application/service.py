@@ -21,6 +21,7 @@ from payments.domain.service import (
     PaymentProcessor,
     RefundAccount,
 )
+from reservations.application.service import ReservationService
 from reservations.domain.enums import ReservationStatus
 from shared.core.exceptions import ForbiddenException
 from shared.core.time import now_utc
@@ -43,10 +44,12 @@ class PaymentService:
         processor: PaymentProcessor,
         payment_repo: PaymentRepository,
         creation_context_provider: PaymentCreationContextProvider,
+        reservation_service: ReservationService,
     ):
         self.processor = processor
         self.payment_repo = payment_repo
         self.creation_context_provider = creation_context_provider
+        self.reservation_service = reservation_service
 
     # 한 예매의 여러 결제 시도를 저장소에서 조회한다. 소유권은 호출자가 먼저 검증해야 한다.
     async def get_payments(self, reservation_id: int) -> list[Payment]:
@@ -70,6 +73,10 @@ class PaymentService:
             and type(amount) is int
             and payment.amount == amount
         ):
+            if payment.status == PaymentStatus.DONE:
+                await self.reservation_service.confirm_reservation(
+                    payment.reservation.reservation_id
+                )
             return payment
         payment.ensure_approvable(payment_key, amount)
         await self._ensure_reservation_payable(payment.reservation.reservation_id)
@@ -98,7 +105,12 @@ class PaymentService:
             result.method,
             result.webhook_secret_hash,
         )
-        return await self.payment_repo.save(payment)
+        payment = await self.payment_repo.save(payment)
+        if payment.status == PaymentStatus.DONE:
+            await self.reservation_service.confirm_reservation(
+                payment.reservation.reservation_id
+            )
+        return payment
 
     # 응답 유실 등으로 결과가 불분명할 때 결제사를 재조회한다. 확인된 같은 주문의 결과만 저장한다.
     async def reconcile(
@@ -116,7 +128,12 @@ class PaymentService:
         if snapshot.payment_key != key:
             raise PaymentIdentityConflict
         apply_snapshot(payment, snapshot)
-        return await self.payment_repo.save(payment)
+        payment = await self.payment_repo.save(payment)
+        if payment.status == PaymentStatus.DONE:
+            await self.reservation_service.confirm_reservation(
+                payment.reservation.reservation_id
+            )
+        return payment
 
     # 같은 예매의 요청을 잠근 뒤 전액 취소한다. 이미 취소된 결제에는 외부 취소를 반복하지 않는다.
     async def cancel(

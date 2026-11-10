@@ -30,6 +30,7 @@ from payments.presentation.routers.v1.webhook_router import (
     provide_deposit_webhook_service,
     router,
 )
+from reservations.application.service import ReservationService
 from shared.core.exceptions import SharedException
 
 
@@ -57,6 +58,7 @@ class DepositWebhookTests(unittest.IsolatedAsyncioTestCase):
 
         self.repo.save.side_effect = save
         self.processor = AsyncMock(spec=PaymentProcessor)
+        self.reservation_service = AsyncMock(spec=ReservationService)
         self.snapshot = PaymentSnapshot(
             "payment-key",
             self.saved.order_id,
@@ -68,7 +70,9 @@ class DepositWebhookTests(unittest.IsolatedAsyncioTestCase):
             "가상계좌",
         )
         self.processor.retrieve.return_value = self.snapshot
-        self.service = DepositWebhookService(self.processor, self.repo)
+        self.service = DepositWebhookService(
+            self.processor, self.repo, self.reservation_service
+        )
 
     async def process(self, **overrides):
         body = {
@@ -86,6 +90,7 @@ class DepositWebhookTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.saved.status, PaymentStatus.DONE)
         self.assertEqual(self.saved.paid_at, self.snapshot.paid_at)
         self.assertEqual(len(self.saved.processed_deposit_events), 1)
+        self.reservation_service.confirm_reservation.assert_awaited_once_with(1)
         self.assertNotIn(self.secret, repr(self.saved))
         self.assertNotIn(self.secret, str(self.saved.payment_log))
 
@@ -94,6 +99,7 @@ class DepositWebhookTests(unittest.IsolatedAsyncioTestCase):
         await self.process()
         self.repo.save.assert_awaited_once()
         self.processor.retrieve.assert_awaited_once()
+        self.reservation_service.confirm_reservation.assert_awaited()
 
     async def test_invalid_or_missing_secret_is_rejected_before_provider_call(self):
         with self.assertRaises(InvalidPaymentWebhook):
@@ -110,6 +116,7 @@ class DepositWebhookTests(unittest.IsolatedAsyncioTestCase):
             await self.process()
         self.assertEqual(self.saved.processed_deposit_events, [])
         self.assertEqual(self.saved.status, PaymentStatus.WAITING_FOR_DEPOSIT)
+        self.reservation_service.confirm_reservation.assert_not_awaited()
         self.repo.save.assert_not_awaited()
 
     async def test_save_conflict_can_be_retried_without_losing_event(self):
@@ -167,10 +174,12 @@ class DepositWebhookTests(unittest.IsolatedAsyncioTestCase):
             self.processor,
             self.repo,
             AsyncMock(spec=PaymentCreationContextProvider),
+            self.reservation_service,
         )
         result = await service.reconcile(7, "payment-key")
         self.assertEqual(result.status, PaymentStatus.DONE)
         self.assertEqual(result.payment_key, "payment-key")
+        self.reservation_service.confirm_reservation.assert_awaited_once_with(1)
 
     async def test_webhook_http_uses_provider_shape_and_returns_no_content(self):
         app = FastAPI()

@@ -24,6 +24,7 @@ from payments.presentation.routers.v1.webhook_router import (
     provide_deposit_webhook_service,
 )
 from shared.core.database import get_db
+from wiring.reservation import build_reservation_service
 
 
 # 결제 API 요청에 사용할 서비스를 조립한다.
@@ -40,6 +41,7 @@ def build_payment_service(
         processor=processor,
         payment_repo=repository,
         creation_context_provider=creation_context_provider,
+        reservation_service=build_reservation_service(session),
     )
 
 
@@ -58,7 +60,11 @@ def build_deposit_webhook_service(
 ) -> DepositWebhookService:
     processor: PaymentProcessor = TossPaymentProcessor.from_env()
     repository = SQLAlchemyPaymentRepository(session)
-    return DepositWebhookService(processor=processor, repository=repository)
+    return DepositWebhookService(
+        processor=processor,
+        repository=repository,
+        reservation_service=build_reservation_service(session),
+    )
 
 
 # 결제 API, 소유권 검사, 입금 웹훅의 placeholder 의존성을 실제 구현체로 바꾼다.

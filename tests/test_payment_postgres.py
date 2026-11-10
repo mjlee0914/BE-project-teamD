@@ -228,6 +228,7 @@ class PaymentPostgresTests(unittest.IsolatedAsyncioTestCase):
             processor,
             self.repository,
             SQLAlchemyPaymentCreationContextProvider(self.session),
+            AsyncMock(),
         )
         payment = await service.create(self.reservation_id, self.user_id)
         with self.assertRaises(PaymentProcessingError):
@@ -247,6 +248,7 @@ class PaymentPostgresTests(unittest.IsolatedAsyncioTestCase):
             processor,
             self.repository,
             SQLAlchemyPaymentCreationContextProvider(self.session),
+            AsyncMock(),
         )
         payment = await service.create(self.reservation_id, self.user_id)
         processor.approve.return_value = PaymentApprovalResult(
@@ -274,7 +276,7 @@ class PaymentPostgresTests(unittest.IsolatedAsyncioTestCase):
             PaymentLog({"status": "DONE"}),
             "가상계좌",
         )
-        webhook = DepositWebhookService(processor, self.repository)
+        webhook = DepositWebhookService(processor, self.repository, AsyncMock())
         for _ in range(2):
             await webhook.process(
                 order_id=payment.order_id,

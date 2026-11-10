@@ -21,6 +21,7 @@ from payments.domain.service import (
     PaymentCreationContextProvider,
     PaymentProcessor,
 )
+from reservations.application.service import ReservationService
 from reservations.domain.enums import ReservationStatus
 from shared.core.exceptions import ForbiddenException
 
@@ -68,6 +69,7 @@ class PaymentServiceTests(unittest.IsolatedAsyncioTestCase):
         self.repo.find_by_reservation_id.return_value = []
         self.repo.save.side_effect = lambda payment: payment
         self.processor = AsyncMock(spec=PaymentProcessor)
+        self.reservation_service = AsyncMock(spec=ReservationService)
         self.creation_context_provider = AsyncMock(spec=PaymentCreationContextProvider)
         self.creation_context_provider.get_context.return_value = (
             PaymentCreationContext(
@@ -80,7 +82,10 @@ class PaymentServiceTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         self.service = PaymentService(
-            self.processor, self.repo, self.creation_context_provider
+            self.processor,
+            self.repo,
+            self.creation_context_provider,
+            self.reservation_service,
         )
 
     async def test_create_saves_payment(self):
@@ -111,6 +116,7 @@ class PaymentServiceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result.status, PaymentStatus.DONE)
         self.assertEqual(result.payment_key, "toss-key")
+        self.reservation_service.confirm_reservation.assert_awaited_once_with(1)
 
     async def test_create_rejects_reservation_owned_by_another_user(self):
         self.creation_context_provider.get_context.return_value = (
@@ -232,6 +238,7 @@ class PaymentServiceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result.status, PaymentStatus.WAITING_FOR_DEPOSIT)
         self.assertIsNone(result.paid_at)
+        self.reservation_service.confirm_reservation.assert_not_awaited()
         self.assertEqual(self.repo.save.await_count, 2)
 
     async def test_successful_approval_and_cancellation_are_saved(self):
@@ -240,6 +247,7 @@ class PaymentServiceTests(unittest.IsolatedAsyncioTestCase):
             PaymentStatus.DONE, now, PaymentLog({"status": "done"})
         )
         await self.service.approve(7, "key", 1000)
+        self.reservation_service.confirm_reservation.assert_awaited_once_with(1)
         self.assertEqual(self.payment.paid_at, now)
         self.processor.cancel.return_value = PaymentCancellationResult(
             now, PaymentLog({"status": "canceled"})
@@ -293,6 +301,21 @@ class PaymentServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(result, self.payment)
         self.processor.approve.assert_not_awaited()
         self.repo.save.assert_not_awaited()
+        self.reservation_service.confirm_reservation.assert_awaited_once_with(1)
+
+    async def test_confirmation_failure_propagates_for_transaction_rollback(self):
+        self.processor.approve.return_value = PaymentApprovalResult(
+            PaymentStatus.DONE, datetime.now(UTC), PaymentLog({})
+        )
+        self.reservation_service.confirm_reservation.side_effect = RuntimeError(
+            "ticket issuance failed"
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "ticket issuance failed"):
+            await self.service.approve(7, "key", 1000)
+
+        self.assertEqual(self.payment.status, PaymentStatus.DONE)
+        self.repo.save.assert_awaited()
 
     async def test_repeated_cancellation_does_not_call_provider(self):
         self.payment.status = PaymentStatus.CANCELED
