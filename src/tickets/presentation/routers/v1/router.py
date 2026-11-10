@@ -11,8 +11,8 @@
   → 반대면 "enter" 같은 글자가 ticket_id(int)로 들어가 422가 남
 """
 
-from typing import Annotated
 from types import SimpleNamespace
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query  # , status
 
@@ -142,6 +142,7 @@ async def get_my_ticket(
 ):
     ticket = await service.get_my_ticket(ticket_id, actor.user_id)
     return APIResponse.ok(data=TicketDetailResponse.model_validate(ticket))
+
 
 # 내 티켓 취소 (양일권은 토·일 한 쌍이 함께 취소되고, 응답에 취소된 티켓 id가 모두 담긴다)
 @router.patch(

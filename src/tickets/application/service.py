@@ -1,17 +1,17 @@
 # DB와web을 모르는 중간 단계 담당자
 # usecase 는 설계도만 지키고, 어떤 저장소가 들어오는지는 wiring이 정함
 
-from datetime import UTC, datetime
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
-from shared.core.time import now_utc
 from performances.domain.enums import PerformanceStatus
 from performances.domain.repository import PerformanceRepository
 from reservations.domain.enums import ReservationStatus
 from reservations.domain.repository import ReservationRepository
 from reservations.domain.reservation import Reservation
 from shared.core.enums import TicketType
+from shared.core.time import now_utc
 from tickets.domain.exceptions import TicketNotCancelable, TicketNotFound
 from tickets.domain.repository import TicketRepository  # 설계도 가져오기
 from tickets.domain.ticket import (
@@ -22,6 +22,7 @@ from tickets.domain.ticket import (
 
 # 잔여 수량을 되돌릴 수 있는 공연 상태 (취소·종료된 공연은 공연 엔티티가 복구를 거부하므로 건너뜀)
 RESTORABLE_STATUSES = (PerformanceStatus.OPEN, PerformanceStatus.SOLD_OUT)
+
 
 # 티켓 취소 결과: 누른 티켓(취소 후 상태)과, 이번 요청으로 함께 취소된 티켓 id
 # - 양일권이면 짝 티켓이 들어 있고, 누른 티켓 id도 포함된다 (예: [1, 3])
