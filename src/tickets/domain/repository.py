@@ -31,6 +31,11 @@ class TicketRepository(ABC):
     async def count_by_reservation_id(self, reservation_id: int) -> int:
         """예매에 이미 발급된 티켓 수를 반환한다. 취소된 티켓도 포함해서 센다."""
 
+    # 예매의 티켓 전체 (예매 취소·공연 취소 시 함께 취소하기 위함, #134)
+    @abstractmethod
+    async def find_all_by_reservation(self, reservation_id: int) -> list[Ticket]:
+        """예매에 발급된 티켓 전체를 반환한다."""
+
     # 중복 발급 동시성 방지
     # "개수 세기 → 0이면 생성"은 두 요청이 동시에 오면 둘 다 0을 보고 통과한다.
     # 그래서 검사 전에 예매 행을 잠가서, 같은 예매의 발급 요청이 한 줄로 서게 한다.

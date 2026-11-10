@@ -10,6 +10,7 @@ from performances.domain.exceptions import (
 )
 from performances.domain.performance import Performance
 from performances.domain.repository import PerformanceRepository
+from reservations.application.service import ReservationService
 from shared.core.time import now_utc
 
 
@@ -17,11 +18,12 @@ class PerformanceService:
     def __init__(
             self,
             performance_repo: PerformanceRepository,
-            festival_repo: FestivalRepository # 공연 생성 및 수정시 축제기간 안에 있는지 검사해야 하므로 축제 꺼냄
-
+            festival_repo: FestivalRepository, # 공연 생성 및 수정시 축제기간 안에 있는지 검사해야 하므로 축제 꺼냄
+            reservation_service: ReservationService,
     ) -> None:
         self._performance_repo = performance_repo
         self._festival_repo = festival_repo
+        self._reservation_service = reservation_service
 
     # 개별 조회
     async def get_performance(self, performance_id: int) -> Performance:
@@ -124,8 +126,18 @@ class PerformanceService:
     async def cancel_performance(self, performance_id: int) -> Performance:
         performance = await self.get_performance(performance_id)
         performance.cancel(now_utc())
-        # TODO: 예매 일괄 취소 (회의 11/9)
-        return await self._performance_repo.save(performance)
+        # 공연 취소 → 관련 예매 일괄 취소 기능 추가
+        # 저장을 먼저 하는 이유:
+        # 예매 쪽이 이 회차를 CANCELED로 읽어야 수량 복구에서 건너뛴다 (취소된 회차는 복구x 이므로)
+        # 양일권은 전체 취소
+        # 남은 요일 회차의 좌석만 복구됨(예매에서 처리)
+        saved_canceled = await self._performance_repo.save(performance)
+        # 예매의 cancel_by_performance 실행하기
+        # 공연 취소 -> 예매도 정리 -> 취소된 공연 돌려준다.
+        await self._reservation_service.cancel_by_performance(saved_canceled)
+        # 취소된 공연을 돌려줌.
+        # -> (이 함수를 부른)라우터가 return 된 "취소된 공연 정보"로 응답을 만든다.
+        return saved_canceled
 
     # 완료 (꺼내기 -> 엔티티 메서드 -> 저장). performance.complete(now_utc())
     async def complete_performance(self, performance_id: int) -> Performance:
