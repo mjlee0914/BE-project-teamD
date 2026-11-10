@@ -1,26 +1,37 @@
 import unittest
-from unittest.mock import AsyncMock
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
 from auth.application.service import AuthService
 from auth.domain.entities import TokenPayload
 from payments.application.service import PaymentService
 from payments.domain.entities import Payment
+from payments.domain.enums import PaymentStatus
 from payments.domain.exceptions import (
     PaymentAttemptConflict,
     PaymentNotFoundException,
     PaymentProcessingError,
     PaymentStatusException,
 )
-from payments.domain.service import PaymentAccessChecker, RefundAccount
+from payments.domain.repository import PaymentRepository
+from payments.domain.service import (
+    PaymentAccessChecker,
+    PaymentCreationContext,
+    PaymentCreationContextProvider,
+    PaymentProcessor,
+    RefundAccount,
+)
 from payments.presentation.dependencies import (
     provide_auth_service,
     provide_payment_access_checker,
     provide_payment_service,
 )
 from payments.presentation.routers.v1.router import router
+from reservations.domain.enums import ReservationStatus
+from shared.core.database import get_db
 from shared.core.exception_handlers import register_exception_handlers
 from shared.core.exceptions import (
     ForbiddenException,
@@ -241,6 +252,54 @@ class PaymentAPITests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 502)
         self.assertTrue(response.json()["errors"]["outcome_unknown"])
         self.assertNotIn("sensitive message", response.text)
+
+    async def test_approval_error_response_commits_definite_and_uncertain_states(self):
+        repository = AsyncMock(spec=PaymentRepository)
+        repository.find_by_id.return_value = self.payment
+        repository.find_by_reservation_id.return_value = []
+        repository.save.side_effect = lambda payment: payment
+        processor = AsyncMock(spec=PaymentProcessor)
+        context = AsyncMock(spec=PaymentCreationContextProvider)
+        context.get_context.return_value = PaymentCreationContext(
+            1,
+            10,
+            "Festival",
+            1000,
+            ReservationStatus.PENDING,
+            datetime.now(UTC) + timedelta(hours=1),
+        )
+        reservations = AsyncMock()
+        service = PaymentService(processor, repository, context, reservations)
+
+        # 실제 get_db와 라우터를 거쳐 502 응답에서도 commit이 실행되는지 확인한다.
+        def provide_service(session=Depends(get_db)):
+            return service
+
+        self.app.dependency_overrides[provide_payment_service] = provide_service
+        for unknown, expected in (
+            (False, PaymentStatus.ABORTED),
+            (True, PaymentStatus.IN_PROGRESS),
+        ):
+            with self.subTest(outcome_unknown=unknown):
+                self.payment.status = PaymentStatus.READY
+                processor.approve.side_effect = PaymentProcessingError(
+                    "private message", code="TOSS_ERROR", outcome_unknown=unknown
+                )
+                session = AsyncMock()
+                factory = MagicMock()
+                factory.return_value.__aenter__.return_value = session
+                with patch("shared.core.database.AsyncSessionLocal", factory):
+                    response = await self.client.post(
+                        "/v1/payments/7/approve",
+                        json={"payment_key": "key", "amount": 1000},
+                        headers=self.headers,
+                    )
+                self.assertEqual(response.status_code, 502)
+                self.assertEqual(response.json()["errors"]["outcome_unknown"], unknown)
+                self.assertEqual(self.payment.status, expected)
+                session.commit.assert_awaited_once()
+                session.rollback.assert_not_awaited()
+                reservations.confirm_reservation.assert_not_awaited()
 
     async def test_missing_payment_returns_not_found(self):
         self.service.get_payment.side_effect = PaymentNotFoundException()

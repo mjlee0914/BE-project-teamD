@@ -272,12 +272,49 @@ class PaymentServiceTests(unittest.IsolatedAsyncioTestCase):
         self.processor.cancel.assert_not_awaited()
 
     async def test_approval_error_propagates_without_assuming_payment_failed(self):
-        self.processor.approve.side_effect = PaymentProcessingError("timeout")
+        self.processor.approve.side_effect = PaymentProcessingError(
+            "timeout", outcome_unknown=True
+        )
         with self.assertRaises(PaymentProcessingError):
             await self.service.approve(7, "key", 1000)
         self.assertEqual(self.payment.status, PaymentStatus.IN_PROGRESS)
         self.assertEqual(self.payment.payment_key, "key")
         self.repo.save.assert_awaited_once()
+        self.reservation_service.confirm_reservation.assert_not_awaited()
+        self.repo.find_by_reservation_id.return_value = [self.payment]
+        with self.assertRaises(PaymentAttemptConflict):
+            await self.service.create(1, 10)
+
+    async def test_definite_rejection_allows_new_payment_and_successful_approval(self):
+        rejection = PaymentProcessingError(
+            "private provider message",
+            code="UNAUTHORIZED_KEY",
+            outcome_unknown=False,
+        )
+        self.processor.approve.side_effect = rejection
+        with self.assertRaises(PaymentProcessingError) as caught:
+            await self.service.approve(7, "rejected-key", 1000)
+
+        self.assertIs(caught.exception, rejection)
+        self.assertEqual(self.payment.status, PaymentStatus.ABORTED)
+        self.assertEqual(self.payment.failed_reason, "UNAUTHORIZED_KEY")
+        self.assertEqual(self.repo.save.await_count, 2)
+        self.reservation_service.confirm_reservation.assert_not_awaited()
+
+        self.repo.find_by_reservation_id.return_value = [self.payment]
+        retry = await self.service.create(1, 10)
+        self.assertEqual(retry.status, PaymentStatus.READY)
+        self.assertNotEqual(retry.order_id, self.payment.order_id)
+
+        retry.payment_id = 8
+        self.repo.find_by_id.return_value = retry
+        self.processor.approve.side_effect = None
+        self.processor.approve.return_value = PaymentApprovalResult(
+            PaymentStatus.DONE, datetime.now(UTC), PaymentLog({})
+        )
+        result = await self.service.approve(8, "new-key", 1000)
+        self.assertEqual(result.status, PaymentStatus.DONE)
+        self.reservation_service.confirm_reservation.assert_awaited_once_with(1)
 
     async def test_other_active_attempt_prevents_provider_request(self):
         other = Payment.create(1, "Festival", 1000)

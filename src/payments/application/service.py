@@ -12,6 +12,7 @@ from payments.domain.exceptions import (
     PaymentIdentityConflict,
     PaymentKeyNotFoundException,
     PaymentNotFoundException,
+    PaymentProcessingError,
     PaymentStatusException,
 )
 from payments.domain.repository import PaymentRepository
@@ -95,7 +96,15 @@ class PaymentService:
         payment = await self.payment_repo.save(payment)
         # 여기서 외부 HTTP 요청이 발생한다. 통신 실패가 실제 승인 실패를 뜻하지는 않는다.
         # 위 save는 flush까지만 하므로 프로세스 중단·전체 rollback 시 진행 기록도 사라질 수 있다.
-        result = await self.processor.approve(payment_key, payment.order_id, amount)
+        try:
+            result = await self.processor.approve(payment_key, payment.order_id, amount)
+        except PaymentProcessingError as exc:
+            # 확정된 거절은 종료해 새 결제를 허용한다. 결과 불명은 재조회할 수 있도록 유지한다.
+            if not exc.outcome_unknown:
+                payment.fail(exc.code)
+                await self.payment_repo.save(payment)
+            # 라우터가 502 응답으로 변환하면 요청 세션이 실패 상태도 commit한다.
+            raise
         payment.approve(
             payment_key,
             amount,
