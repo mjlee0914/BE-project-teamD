@@ -73,13 +73,13 @@ class ReservationService:
         festival_repo: FestivalRepository,
         performance_repo: PerformanceRepository,
         ticket_repo: TicketRepository,
-        ticket_service: TicketService
+        ticket_service: TicketService,
     ) -> None:
         self._reservation_repo = reservation_repo
         self._festival_repo = festival_repo
         self._performance_repo = performance_repo
         self._ticket_repo = ticket_repo
-        self._ticket_service = ticket_service 
+        self._ticket_service = ticket_service
 
     # ------------------------------------------------------------------
     # 내부 도우미
@@ -275,7 +275,9 @@ class ReservationService:
         # return await self._reservation_repo.save(reservation)
 
         # ④ 상태 변경 (이미 끝난 예매면 엔티티가 409) + 티켓 취소·잔여 수량 복구
-        had_tickets = reservation.status == ReservationStatus.CONFIRMED  # 확정된 예매만 티켓이 있음
+        had_tickets = (
+            reservation.status == ReservationStatus.CONFIRMED
+        )  # 확정된 예매만 티켓이 있음
         reservation.cancel(now)
         if had_tickets:
             # 티켓이 있으면 티켓 서비스가 티켓 취소와 잔여 수량 복구를 함께 처리
@@ -283,7 +285,7 @@ class ReservationService:
         else:
             # 티켓이 없는 PENDING 예매는 예매 수량만큼 복구
             await self._restore_remaining(reservation)
-        return await self._reservation_repo.save(reservation)    
+        return await self._reservation_repo.save(reservation)
 
     # ------------------------------------------------------------------
     # 관리자 유스케이스 (#117)
@@ -390,7 +392,8 @@ class ReservationService:
             else:
                 await self._restore_remaining(reservation)
             await self._reservation_repo.save(reservation)
-            return len(targets) 
+        return len(targets)
+
     # [작업 5] 진행 중 예매 여부 (회원 탈퇴 검사용)
     async def has_active_reservation(self, user_id: int) -> bool:
         return await self._reservation_repo.exists_active_by_user(user_id)
