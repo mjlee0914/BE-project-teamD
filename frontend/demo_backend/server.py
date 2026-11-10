@@ -33,12 +33,10 @@ from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 import seed as demo_seed  # noqa: E402
 from main import app  # noqa: E402  ← 팀 앱 그대로
 from reservations.infrastructure.models import Reservation as ReservationModel  # noqa: E402
-from reservations.presentation.dependencies import (  # noqa: E402
-    CurrentActor as ReservationActor,
-    get_current_actor as reservation_actor_placeholder,
-    provide_reservation_service,
-)
+from reservations.presentation.dependencies import provide_reservation_service  # noqa: E402
 from reservations.presentation.schemas import ReservationResponse  # noqa: E402
+from shared.core.actor import CurrentActor as ReservationActor  # noqa: E402  예매·공연·축제 공용 actor
+from shared.core.actor import get_current_actor as reservation_actor_placeholder  # noqa: E402
 from shared.core.database import get_db  # noqa: E402
 from shared.core.exceptions import UnauthorizedException  # noqa: E402
 from shared.core.schemas import APIResponse  # noqa: E402

@@ -32,5 +32,5 @@ def init_models() -> None:
     import payments.infrastructure.models
     import performances.infrastructure.models
     import reservations.infrastructure.models
-    import users.infrastructure.models
     import tickets.infrastructure.models
+    import users.infrastructure.models
