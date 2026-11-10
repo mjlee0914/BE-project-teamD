@@ -19,6 +19,7 @@ from reservations.application.service import ReservationService
 from reservations.infrastructure.repositories import SqlalchemyReservationRepository
 from shared.core.database import AsyncSessionLocal
 from shared.core.logger import get_logger
+from tickets.application.service import TicketService
 from tickets.infrastructure.repositories import SqlAlchemyTicketRepository
 
 logger = get_logger(__file__)
@@ -29,11 +30,25 @@ EXPIRE_INTERVAL_SECONDS = 60  # 1분마다 검사
 async def run_expire_once() -> int:
     async with AsyncSessionLocal() as session:
         try:
+            # service = ReservationService(
+            #     reservation_repo=SqlalchemyReservationRepository(session),
+            #     festival_repo=SqlAlchemyFestivalRepository(session),
+            #     performance_repo=SqlAlchemyPerformanceRepository(session),
+            #     ticket_repo=SqlAlchemyTicketRepository(session),
+            # )
+            reservation_repo = SqlalchemyReservationRepository(session)
+            performance_repo = SqlAlchemyPerformanceRepository(session)
+            ticket_repo = SqlAlchemyTicketRepository(session)
             service = ReservationService(
-                reservation_repo=SqlalchemyReservationRepository(session),
+                reservation_repo=reservation_repo,
                 festival_repo=SqlAlchemyFestivalRepository(session),
-                performance_repo=SqlAlchemyPerformanceRepository(session),
-                ticket_repo=SqlAlchemyTicketRepository(session),
+                performance_repo=performance_repo,
+                ticket_repo=ticket_repo,
+                ticket_service=TicketService(
+                    ticket_repo=ticket_repo,
+                    reservation_repo=reservation_repo,
+                    performance_repo=performance_repo,
+                ),
             )
             count = await service.expire_overdue()
             await session.commit()

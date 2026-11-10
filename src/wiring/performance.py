@@ -10,21 +10,43 @@ from performances.presentation.dependencies import get_performance_service
 from reservations.application.service import ReservationService
 from reservations.infrastructure.repositories import SqlalchemyReservationRepository
 from shared.core.database import get_db
+from tickets.application.service import TicketService
 from tickets.infrastructure.repositories import SqlAlchemyTicketRepository
 
+# def build_performance_service(
+#         session: Annotated[AsyncSession, Depends(get_db)],
+# ) -> PerformanceService:
+#     return PerformanceService(
+#         performance_repo=SqlAlchemyPerformanceRepository(session),
+#         festival_repo=SqlAlchemyFestivalRepository(session),
+#         reservation_service=ReservationService(
+#             reservation_repo=SqlalchemyReservationRepository(session),
+#             festival_repo=SqlAlchemyFestivalRepository(session),
+#             performance_repo=SqlAlchemyPerformanceRepository(session),
+#             ticket_repo=SqlAlchemyTicketRepository(session),
+#             )
+#     )
 
 def build_performance_service(
-        session: Annotated[AsyncSession, Depends(get_db)],
+    session: Annotated[AsyncSession, Depends(get_db)],
 ) -> PerformanceService:
+    reservation_repo = SqlalchemyReservationRepository(session)
+    performance_repo = SqlAlchemyPerformanceRepository(session)
+    ticket_repo = SqlAlchemyTicketRepository(session)
     return PerformanceService(
-        performance_repo=SqlAlchemyPerformanceRepository(session),
+        performance_repo=performance_repo,
         festival_repo=SqlAlchemyFestivalRepository(session),
         reservation_service=ReservationService(
-            reservation_repo=SqlalchemyReservationRepository(session),
+            reservation_repo=reservation_repo,
             festival_repo=SqlAlchemyFestivalRepository(session),
-            performance_repo=SqlAlchemyPerformanceRepository(session),
-            ticket_repo=SqlAlchemyTicketRepository(session),
-            )
+            performance_repo=performance_repo,
+            ticket_repo=ticket_repo,
+            ticket_service=TicketService(
+                ticket_repo=ticket_repo,
+                reservation_repo=reservation_repo,
+                performance_repo=performance_repo,
+            ),
+        ),
     )
 
 def wire_performance_dependencies(app: FastAPI) -> None:
