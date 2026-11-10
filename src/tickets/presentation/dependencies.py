@@ -2,7 +2,12 @@
 # 라우터가 Depends()로 받아 쓰는 "자리표시자" 의존성 모음
 
 from dataclasses import dataclass
+from typing import Annotated
 
+from fastapi import Depends
+from fastapi.security import HTTPAuthorizationCredentials
+
+from shared.core.actor import bearer
 from tickets.application.service import TicketService
 
 
@@ -24,5 +29,8 @@ class CurrentActor:
 #   - 토큰 검증(auth) → user_id 추출
 #   - (TODO) 관리자·활성 회원 확인(users) → is_admin 채우기
 # 로그인이 안 된 요청은 이 단계에서 걸러져 라우터까지 오지 않는다 (401)
-async def get_current_actor() -> CurrentActor:
+# credentials 파라미터: Swagger 자물쇠 표시용 (shared/core/actor.py 참고)
+async def get_current_actor(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+) -> CurrentActor:
     raise NotImplementedError("get_current_actor 의존성이 주입되지 않았습니다.")
