@@ -97,7 +97,7 @@ class UserService:
     ) -> None:
         # [1] 회원 조회: 없으면 404
         user = await self._get_user(user_id)
-        # [2] 도메인 규칙 실행: 탈퇴 회원 409, 기존 비밀번호 불일치·재사용·형식 위반 422 (규칙 12~14)
+        # [2] 도메인 규칙 실행: 탈퇴 회원 403, 기존 비밀번호 불일치·재사용·형식 위반 422 (규칙 12~14)
         user.change_password(
             old_password=old_password,
             new_password=new_password,

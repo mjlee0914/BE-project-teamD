@@ -7,7 +7,7 @@
 # PasswordHasher
 - 비밀번호를 해시로 바꾸고(hash), 입력값이 해시와 맞는지 확인(verify)하는 기능
 - User 엔티티는 이 인터페이스만 보고 비밀번호를 처리 (User.create, change_password)
-- 실제 구현(bcrypt)은 infrastructure/security.py의 BcryptPasswordHasher가 담당
+- 실제 구현(bcrypt)은 auth/infrastructure/password_hasher.py의 BcryptPasswordHasher가 담당
 - domain은 bcrypt 라이브러리를 몰라도 됨 (의존성 역전)
 - 나중에 해싱 방식을 바꿔도 domain 코드는 수정하지 않아도 됨
 
