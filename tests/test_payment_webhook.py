@@ -21,7 +21,11 @@ from payments.domain.exceptions import (
     PaymentStatusException,
 )
 from payments.domain.repository import PaymentRepository
-from payments.domain.service import PaymentProcessor, PaymentSnapshot
+from payments.domain.service import (
+    PaymentCreationContextProvider,
+    PaymentProcessor,
+    PaymentSnapshot,
+)
 from payments.presentation.routers.v1.webhook_router import (
     provide_deposit_webhook_service,
     router,
@@ -159,7 +163,11 @@ class DepositWebhookTests(unittest.IsolatedAsyncioTestCase):
     async def test_reconcile_recovers_lost_approval_response(self):
         self.saved.status = PaymentStatus.READY
         self.saved.payment_key = None
-        service = PaymentService(self.processor, self.repo)
+        service = PaymentService(
+            self.processor,
+            self.repo,
+            AsyncMock(spec=PaymentCreationContextProvider),
+        )
         result = await service.reconcile(7, "payment-key")
         self.assertEqual(result.status, PaymentStatus.DONE)
         self.assertEqual(result.payment_key, "payment-key")

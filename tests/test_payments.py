@@ -1,5 +1,5 @@
 import unittest
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 from payments.application.service import PaymentService
@@ -17,8 +17,12 @@ from payments.domain.repository import PaymentRepository
 from payments.domain.service import (
     PaymentApprovalResult,
     PaymentCancellationResult,
+    PaymentCreationContext,
+    PaymentCreationContextProvider,
     PaymentProcessor,
 )
+from reservations.domain.enums import ReservationStatus
+from shared.core.exceptions import ForbiddenException
 
 
 class PaymentDomainTests(unittest.TestCase):
@@ -64,11 +68,152 @@ class PaymentServiceTests(unittest.IsolatedAsyncioTestCase):
         self.repo.find_by_reservation_id.return_value = []
         self.repo.save.side_effect = lambda payment: payment
         self.processor = AsyncMock(spec=PaymentProcessor)
-        self.service = PaymentService(self.processor, self.repo)
+        self.creation_context_provider = AsyncMock(spec=PaymentCreationContextProvider)
+        self.creation_context_provider.get_context.return_value = (
+            PaymentCreationContext(
+                reservation_id=1,
+                user_id=10,
+                festival_name="Festival",
+                amount=1000,
+                reservation_status=ReservationStatus.PENDING,
+                expires_at=datetime.now(UTC) + timedelta(hours=1),
+            )
+        )
+        self.service = PaymentService(
+            self.processor, self.repo, self.creation_context_provider
+        )
 
     async def test_create_saves_payment(self):
-        result = await self.service.create(1, "Festival", 1000)
+        result = await self.service.create(1, 10)
+        self.assertEqual(result.reservation.reservation_id, 1)
+        self.assertEqual(result.reservation.festival_name, "Festival")
+        self.assertEqual(result.amount, 1000)
+        self.assertEqual(result.status, PaymentStatus.READY)
+        self.repo.lock_reservation.assert_awaited_once_with(1)
+        self.assertEqual(self.creation_context_provider.get_context.await_count, 2)
         self.repo.save.assert_awaited_once_with(result)
+        self.processor.approve.assert_not_awaited()
+
+    async def test_create_then_approve_uses_created_order(self):
+        payment = await self.service.create(1, 10)
+        self.repo.find_by_id.return_value = payment
+        self.processor.approve.return_value = PaymentApprovalResult(
+            PaymentStatus.DONE,
+            datetime.now(UTC),
+            PaymentLog({"status": "done"}),
+            method="카드",
+        )
+
+        result = await self.service.approve(payment.payment_id or 7, "toss-key", 1000)
+
+        self.processor.approve.assert_awaited_once_with(
+            "toss-key", payment.order_id, payment.amount
+        )
+        self.assertEqual(result.status, PaymentStatus.DONE)
+        self.assertEqual(result.payment_key, "toss-key")
+
+    async def test_create_rejects_reservation_owned_by_another_user(self):
+        self.creation_context_provider.get_context.return_value = (
+            PaymentCreationContext(
+                reservation_id=1,
+                user_id=11,
+                festival_name="Festival",
+                amount=1000,
+                reservation_status=ReservationStatus.PENDING,
+                expires_at=datetime.now(UTC) + timedelta(hours=1),
+            )
+        )
+        with self.assertRaises(ForbiddenException):
+            await self.service.create(1, 10)
+        self.repo.save.assert_not_awaited()
+
+    async def test_create_rejects_non_pending_or_expired_reservation(self):
+        future = datetime.now(UTC) + timedelta(hours=1)
+        contexts = (
+            PaymentCreationContext(
+                1, 10, "Festival", 1000, ReservationStatus.CONFIRMED, future
+            ),
+            PaymentCreationContext(
+                1,
+                10,
+                "Festival",
+                1000,
+                ReservationStatus.PENDING,
+                datetime.now(UTC),
+            ),
+        )
+        for context in contexts:
+            with self.subTest(context=context):
+                self.creation_context_provider.get_context.return_value = context
+                with self.assertRaises(PaymentStatusException):
+                    await self.service.create(1, 10)
+        self.repo.save.assert_not_awaited()
+
+    async def test_create_rejects_duplicate_payment_attempt(self):
+        existing = Payment.create(1, "Festival", 1000)
+        existing.status = PaymentStatus.DONE
+        self.repo.find_by_reservation_id.return_value = [existing]
+        with self.assertRaises(PaymentAttemptConflict):
+            await self.service.create(1, 10)
+        self.repo.save.assert_not_awaited()
+
+    async def test_create_reuses_ready_attempt(self):
+        existing = Payment.create(1, "Festival", 1000)
+        existing.payment_id = 11
+        self.repo.find_by_reservation_id.return_value = [existing]
+
+        result = await self.service.create(1, 10)
+
+        self.assertIs(result, existing)
+        self.repo.save.assert_not_awaited()
+
+    async def test_create_accepts_naive_utc_expiration(self):
+        self.creation_context_provider.get_context.return_value = (
+            PaymentCreationContext(
+                reservation_id=1,
+                user_id=10,
+                festival_name="Festival",
+                amount=1000,
+                reservation_status=ReservationStatus.PENDING,
+                expires_at=(datetime.now(UTC) + timedelta(hours=1)).replace(
+                    tzinfo=None
+                ),
+            )
+        )
+
+        result = await self.service.create(1, 10)
+
+        self.assertEqual(result.status, PaymentStatus.READY)
+
+    async def test_create_rejects_zero_amount(self):
+        self.creation_context_provider.get_context.return_value = (
+            PaymentCreationContext(
+                reservation_id=1,
+                user_id=10,
+                festival_name="Festival",
+                amount=0,
+                reservation_status=ReservationStatus.PENDING,
+                expires_at=datetime.now(UTC) + timedelta(hours=1),
+            )
+        )
+        with self.assertRaises(InvalidAmountException):
+            await self.service.create(1, 10)
+        self.repo.save.assert_not_awaited()
+
+    async def test_approval_rejects_expired_reservation_before_provider_call(self):
+        self.creation_context_provider.get_context.return_value = (
+            PaymentCreationContext(
+                reservation_id=1,
+                user_id=10,
+                festival_name="Festival",
+                amount=1000,
+                reservation_status=ReservationStatus.PENDING,
+                expires_at=datetime.now(UTC) - timedelta(seconds=1),
+            )
+        )
+        with self.assertRaises(PaymentStatusException):
+            await self.service.approve(7, "key", 1000)
+        self.processor.approve.assert_not_awaited()
 
     async def test_amount_mismatch_does_not_call_processor_or_mutate(self):
         with self.assertRaises(InvalidAmountException):

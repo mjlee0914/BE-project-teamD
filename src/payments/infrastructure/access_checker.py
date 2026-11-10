@@ -3,7 +3,11 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from payments.domain.service import PaymentAccessChecker
+from payments.domain.service import (
+    PaymentAccessChecker,
+    PaymentCreationContext,
+    PaymentCreationContextProvider,
+)
 from reservations.infrastructure.models import Reservation as ReservationModel
 from shared.core.exceptions import ForbiddenException
 
@@ -24,3 +28,28 @@ class SQLAlchemyPaymentAccessChecker(PaymentAccessChecker):
         owner_id = result.scalar_one_or_none()
         if owner_id is None or owner_id != user_id:
             raise ForbiddenException("본인의 예매에 연결된 결제만 이용할 수 있습니다.")
+
+
+class SQLAlchemyPaymentCreationContextProvider(PaymentCreationContextProvider):
+    """결제 생성 시 DB에서 예매 소유자와 서버 기준 금액을 읽는다."""
+
+    def __init__(self, session: AsyncSession):
+        self._session = session
+
+    async def get_context(self, reservation_id: int) -> PaymentCreationContext | None:
+        result = await self._session.execute(
+            select(ReservationModel)
+            .where(ReservationModel.id == reservation_id)
+            .execution_options(populate_existing=True)
+        )
+        reservation = result.scalar_one_or_none()
+        if reservation is None:
+            return None
+        return PaymentCreationContext(
+            reservation_id=reservation.id,
+            user_id=reservation.user_id,
+            festival_name=reservation.festival_name,
+            amount=reservation.final_price,
+            reservation_status=reservation.status,
+            expires_at=reservation.expires_at,
+        )
