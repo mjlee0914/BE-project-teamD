@@ -128,6 +128,19 @@ class SqlAlchemyTicketRepository(
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
+    # 본인 예매 행을 잠근다 (SELECT ... FOR UPDATE)
+    # 같은 행을 잠그려는 다른 요청은 이 요청이 끝날 때까지 기다린다
+    async def lock_reservation(self, reservation_id: int, user_id: int) -> None:
+        stmt = (
+            select(ReservationModel.id)
+            .where(
+                ReservationModel.id == reservation_id,
+                ReservationModel.user_id == user_id,
+            )
+            .with_for_update()  # 이 조건에 맞는 행을 읽으면서 동시에 잠가라
+        )
+        await self._session.execute(stmt)  # 이 시점에 잠금이 걸림.
+
     async def find_all_by_user(
         self, user_id: int, status: TicketStatus | None, offset: int, limit: int
     ) -> list[Ticket]:
