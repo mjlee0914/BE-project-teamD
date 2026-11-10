@@ -34,7 +34,6 @@ from tickets.presentation.routers.v1.router import router as ticket_router
 from wiring import wire_dependencies
 
 
-
 # 서버 시작·종료 시 할 일
 # - 시작 : 입금 기한 지난 예매를 만료시키는 주기 작업 실행 (#134)
 # - 종료 : 주기 작업 멈추기
