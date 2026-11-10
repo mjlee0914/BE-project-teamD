@@ -56,28 +56,32 @@ class TicketService:
 
     # --- 생성 ---
 
-    # 승인된 예매의 티켓을 모두 만든다 (회차 수 × 수량장)
+    # 승인된 예매의 티켓을 모두 만든다 (회차 수 × 수량)
     async def create_tickets(self, reservation_id: int, user_id: int) -> list[Ticket]:
-        # ① 예매 조회: 없거나 남의 예매면 똑같이 404 (존재 여부를 숨김)
+        # ① 예매 행 잠금: 같은 예매의 발급 요청이 동시에 오면 한 줄로 세운다
+        # 잠음은 예매조회보다 먼저 작성.
+        await self._ticket_repo.lock_reservation(reservation_id, user_id)
+
+        # ② 예매 조회: 없거나 남의 예매면 똑같이 404 (존재 여부를 숨김)
         reservation = await self._reservation_repo.find_by_id(reservation_id)
         if reservation is None or reservation.user_id != user_id:
             raise ReservationNotFound()
 
-        # ② 승인된 예매만 티켓을 발급한다
+        # ③ 승인된 예매만 티켓을 발급한다
         if reservation.status != ReservationStatus.CONFIRMED:
             raise TicketNotIssuable()
 
-        # ③ 중복 발급 검사: 티켓은 한 번에 전부 만들어지므로 하나라도 있으면 이미 발급됨
+        # ④ 중복 발급 검사: 티켓은 한 번에 전부 만들어지므로 하나라도 있으면 이미 발급됨
         #    (취소된 티켓도 세므로 취소 후 재발급은 불가)
         if await self._ticket_repo.count_by_reservation_id(reservation_id) > 0:
             raise TicketAlreadyIssued()
 
-        # ④ 티켓 종류에 맞는 회차 조회 (SAT·SUN은 1개, BOTH는 2개)
+        # ⑤ 티켓 종류에 맞는 회차 조회 (SAT·SUN은 1개, BOTH는 2개)
         performances = await self._find_target_performances(
             reservation.festival_id, reservation.ticket_type
         )
 
-        # ⑤ 회차마다 수량만큼 티켓 생성 → 확정(ISSUED) → 저장
+        # ⑥ 회차마다 수량만큼 티켓 생성 → 확정(ISSUED) → 저장
         now = datetime.now(UTC)
         tickets: list[Ticket] = []
         for performance in performances:
