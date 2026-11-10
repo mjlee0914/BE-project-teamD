@@ -55,6 +55,26 @@ class PaymentAccessChecker(ABC):
         """예매 소유자가 아니거나 예매가 없으면 접근을 거절한다."""
 
 
+@dataclass(frozen=True)
+class PaymentCreationContext:
+    """서버가 예매에서 읽어 결제 생성에 사용하는 값이다."""
+
+    reservation_id: int
+    user_id: int
+    festival_name: str
+    amount: int
+    reservation_status: str
+    expires_at: datetime | None
+
+
+class PaymentCreationContextProvider(ABC):
+    """예매 정보를 읽는 구현체를 애플리케이션 서비스에 제공한다."""
+
+    @abstractmethod
+    async def get_context(self, reservation_id: int) -> PaymentCreationContext | None:
+        """결제 생성에 필요한 예매 정보를 반환한다."""
+
+
 # 승인·조회·취소에 대한 결제사 계약이다. 실제 토스 HTTP 구현과 모의 구현을 같은 방식으로 사용할 수 있다.
 class PaymentProcessor(ABC):
     # 결제 키로 외부 결제사의 최신 상태를 읽어 PaymentSnapshot으로 반환하도록 정의한다.

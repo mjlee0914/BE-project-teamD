@@ -5,8 +5,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from payments.application.service import PaymentService
 from payments.application.webhook_service import DepositWebhookService
-from payments.domain.service import PaymentAccessChecker, PaymentProcessor
-from payments.infrastructure.access_checker import SQLAlchemyPaymentAccessChecker
+from payments.domain.service import (
+    PaymentAccessChecker,
+    PaymentCreationContextProvider,
+    PaymentProcessor,
+)
+from payments.infrastructure.access_checker import (
+    SQLAlchemyPaymentAccessChecker,
+    SQLAlchemyPaymentCreationContextProvider,
+)
 from payments.infrastructure.sqlalchemy_repository import SQLAlchemyPaymentRepository
 from payments.infrastructure.toss_service import TossPaymentProcessor
 from payments.presentation.dependencies import (
@@ -26,7 +33,14 @@ def build_payment_service(
 ) -> PaymentService:
     processor: PaymentProcessor = TossPaymentProcessor.from_env()
     repository = SQLAlchemyPaymentRepository(session)
-    return PaymentService(processor=processor, payment_repo=repository)
+    creation_context_provider: PaymentCreationContextProvider = (
+        SQLAlchemyPaymentCreationContextProvider(session)
+    )
+    return PaymentService(
+        processor=processor,
+        payment_repo=repository,
+        creation_context_provider=creation_context_provider,
+    )
 
 
 # 결제 소유권 확인기를 조립한다.

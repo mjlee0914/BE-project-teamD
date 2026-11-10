@@ -17,6 +17,14 @@ class ApprovalRequest(BaseModel):
     amount: int = Field(gt=0, strict=True)
 
 
+class PaymentCreateRequest(BaseModel):
+    """결제 대상 예매만 지정하며 금액은 서버가 예매에서 읽는다."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reservation_id: int = Field(gt=0, strict=True)
+
+
 # 저장된 결제 키를 기본으로 쓰되, 복구 요청에서 명시적인 키를 전달할 수 있게 한다.
 class ReconciliationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")

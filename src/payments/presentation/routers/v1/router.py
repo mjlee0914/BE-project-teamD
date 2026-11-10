@@ -18,6 +18,7 @@ from payments.presentation.dependencies import (
 from payments.presentation.schemas import (
     ApprovalRequest,
     CancellationRequest,
+    PaymentCreateRequest,
     PaymentResponse,
     ReconciliationRequest,
 )
@@ -43,6 +44,20 @@ async def get_owned_payment(
 
 # 이 타입을 매개변수로 선언한 API는 공통 소유권 검사를 먼저 실행한다.
 OwnedPayment = Annotated[Payment, Depends(get_owned_payment)]
+
+
+@router.post(
+    "/payments",
+    status_code=201,
+    response_model=APIResponse[PaymentResponse],
+)
+async def create_payment(
+    request: PaymentCreateRequest,
+    user: CurrentUser,
+    service: Service,
+):
+    payment = await service.create(request.reservation_id, user.user_id)
+    return APIResponse.ok(data=PaymentResponse.from_domain(payment))
 
 
 # 연동 오류를 502 공통 응답으로 바꾸고 오류 코드·결과 불명 여부만 공개한다. 원문 결제 로그는 반환하지 않는다.

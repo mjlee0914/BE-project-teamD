@@ -34,6 +34,7 @@ class PaymentAPITests(unittest.IsolatedAsyncioTestCase):
         self.service = AsyncMock(spec=PaymentService)
         self.service.get_payment.return_value = self.payment
         self.service.get_payments.return_value = [self.payment]
+        self.service.create.return_value = self.payment
         self.service.approve.return_value = self.payment
         self.service.cancel.return_value = self.payment
         self.service.reconcile.return_value = self.payment
@@ -72,6 +73,25 @@ class PaymentAPITests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("payment_key", data)
         self.assertNotIn("failed_reason", data)
         self.assertNotIn("payment_log", data)
+
+    async def test_create_uses_reservation_id_and_authenticated_user(self):
+        response = await self.client.post(
+            "/v1/payments",
+            json={"reservation_id": 1},
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 201)
+        self.service.create.assert_awaited_once_with(1, 10)
+        self.assertEqual(response.json()["data"]["status"], "READY")
+
+    async def test_create_rejects_client_supplied_amount(self):
+        response = await self.client.post(
+            "/v1/payments",
+            json={"reservation_id": 1, "amount": 1},
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 422)
+        self.service.create.assert_not_awaited()
 
     async def test_missing_token_is_rejected(self):
         response = await self.client.get("/v1/payments/7")

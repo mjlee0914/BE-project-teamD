@@ -9,17 +9,30 @@ from payments.domain.exceptions import (
     PaymentIdentityConflict,
     PaymentKeyNotFoundException,
     PaymentNotFoundException,
+    PaymentStatusException,
 )
 from payments.domain.repository import PaymentRepository
-from payments.domain.service import PaymentProcessor, RefundAccount
+from payments.domain.service import (
+    PaymentCreationContextProvider,
+    PaymentProcessor,
+    RefundAccount,
+)
+from shared.core.exceptions import ForbiddenException
+from shared.core.time import now_utc
 
 
 # 결제 상태 변경의 순서를 관리한다. 소유권 검사는 이 서비스 호출 전 API 의존성에서 수행한다.
 class PaymentService:
     # 외부에서 전달받은 의존성을 보관한다. 여기서 DB 연결이나 업무 처리를 새로 시작하지 않는다.
-    def __init__(self, processor: PaymentProcessor, payment_repo: PaymentRepository):
+    def __init__(
+        self,
+        processor: PaymentProcessor,
+        payment_repo: PaymentRepository,
+        creation_context_provider: PaymentCreationContextProvider | None = None,
+    ):
         self.processor = processor
         self.payment_repo = payment_repo
+        self.creation_context_provider = creation_context_provider
 
     # 한 예매의 여러 결제 시도를 저장소에서 조회한다. 소유권은 호출자가 먼저 검증해야 한다.
     async def get_payments(self, reservation_id: int) -> list[Payment]:
@@ -123,10 +136,36 @@ class PaymentService:
         return await self.payment_repo.save(payment)
 
     # 신뢰할 수 있는 예매 정보·금액으로 새 결제 시도를 저장한다. 클라이언트용 공개 생성 API는 아니다.
-    async def create(
-        self, reservation_id: int, festival_name: str, amount: int
-    ) -> Payment:
+    async def create(self, reservation_id: int, user_id: int) -> Payment:
+        if self.creation_context_provider is None:
+            raise RuntimeError("결제 생성용 예매 정보 공급자가 연결되지 않았습니다.")
+        await self.payment_repo.lock_reservation(reservation_id)
+        context = await self.creation_context_provider.get_context(reservation_id)
+        if context is None or context.user_id != user_id:
+            raise ForbiddenException("본인의 예매에 연결된 결제만 생성할 수 있습니다.")
+        if context.reservation_status != "PENDING":
+            raise PaymentStatusException(
+                "결제는 대기 중인 예매에서만 생성할 수 있습니다."
+            )
+        if context.expires_at is None or context.expires_at <= now_utc():
+            raise PaymentStatusException(
+                "예매 대기 시간이 만료되어 결제를 생성할 수 없습니다."
+            )
+        attempts = await self.payment_repo.find_by_reservation_id(reservation_id)
+        if any(
+            attempt.status
+            in (
+                PaymentStatus.READY,
+                PaymentStatus.IN_PROGRESS,
+                PaymentStatus.WAITING_FOR_DEPOSIT,
+                PaymentStatus.DONE,
+            )
+            for attempt in attempts
+        ):
+            raise PaymentAttemptConflict
         payment = Payment.create(
-            reservation_id=reservation_id, festival_name=festival_name, amount=amount
+            reservation_id=reservation_id,
+            festival_name=context.festival_name,
+            amount=context.amount,
         )
         return await self.payment_repo.save(payment)
