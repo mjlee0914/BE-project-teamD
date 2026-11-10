@@ -14,6 +14,9 @@ FastAPI 앱의 시작점
 from fastapi import FastAPI
 
 # 프로젝트 코드
+from reservations.presentation.routers.v1.router import (
+    admin_router as reservation_admin_router,
+)
 from reservations.presentation.routers.v1.router import router as reservation_router
 from shared.core.exception_handlers import register_exception_handlers
 from users.presentation.routers.v1.router import router as user_router
@@ -40,6 +43,7 @@ wire_dependencies(app)
 # 도메인별 라우터 등록
 # 새 도메인 라우터를 만들면 위에서 import하고 여기에 include_router를 추가
 app.include_router(reservation_router)
+app.include_router(reservation_admin_router)  # 축제별 예매 목록 (관리자, #117)
 app.include_router(user_router)
 app.include_router(performance_router)
 app.include_router(festival_router)
