@@ -2,8 +2,10 @@
 # usecase 는 설계도만 지키고, 어떤 저장소가 들어오는지는 wiring이 정함
 
 from datetime import UTC, datetime
+from dataclasses import dataclass
 from uuid import UUID
 
+from shared.core.time import now_utc
 from performances.domain.enums import PerformanceStatus
 from performances.domain.repository import PerformanceRepository
 from reservations.domain.enums import ReservationStatus
@@ -20,6 +22,13 @@ from tickets.domain.ticket import (
 
 # 잔여 수량을 되돌릴 수 있는 공연 상태 (취소·종료된 공연은 공연 엔티티가 복구를 거부하므로 건너뜀)
 RESTORABLE_STATUSES = (PerformanceStatus.OPEN, PerformanceStatus.SOLD_OUT)
+
+# 티켓 취소 결과: 누른 티켓(취소 후 상태)과, 이번 요청으로 함께 취소된 티켓 id
+# - 양일권이면 짝 티켓이 들어 있고, 누른 티켓 id도 포함된다 (예: [1, 3])
+@dataclass(frozen=True)
+class TicketCancelResult:
+    ticket: Ticket
+    canceled_ticket_ids: list[int]
 
 
 # 티켓과 관련된 업무를 모아두는 상자
@@ -103,15 +112,17 @@ class TicketService:
     # 내 티켓 취소 (규칙 여섯 개는 아래 도우미 메서드에 나눠 놓았다)
     # - 토요일권·일요일권: 누른 1장 / 양일권: 토·일 한 쌍을 함께 취소
     # - 취소한 장마다 그 회차 잔여 수량 +1, 티켓이 전부 취소되면 예매도 CANCELED
-    async def cancel_ticket(self, ticket_id: int, user_id: int) -> Ticket:
-        ticket = await self.get_my_ticket(
-            ticket_id, user_id
-        )  # ① 내 티켓인지 (아니면 404)
-        await self._reservation_repo.lock(
-            ticket.reservation_id
-        )  # ② 같은 예매 요청을 줄 세움
+    # - 결과에 함께 취소된 티켓 id를 담아 돌려준다 (양일권이면 짝 티켓 포함)
+    async def cancel_ticket(self, ticket_id: int, user_id: int) -> TicketCancelResult:
+        # ① 내 티켓인지 확인 (없거나 남의 티켓이면 404). 여기서는 예매 id를 알아내는 용도
+        ticket = await self.get_my_ticket(ticket_id, user_id)
 
-        # 티켓 종류(SAT/SUN/BOTH)는 예매에 있으므로 예매와 예매의 티켓 전체를 조회
+        # ② 같은 예매를 다루는 다른 요청이 끝날 때까지 기다린다
+        await self._reservation_repo.lock(ticket.reservation_id)
+
+        # ③ 잠근 "뒤에" 예매와 티켓 전체를 읽는다
+        #    find_all_by_reservation은 populate_existing이라 ①에서 읽어 둔 옛 값이 아니라
+        #    DB 최신 값을 돌려준다 (동시 요청이 먼저 취소했다면 여기서 CANCELED로 보임)
         reservation = await self._reservation_repo.find_by_id(ticket.reservation_id)
         if reservation is None:
             raise TicketNotFound()
@@ -119,24 +130,27 @@ class TicketService:
             ticket.reservation_id
         )
 
-        targets = self._pick_cancel_targets(  # ③ 함께 취소할 티켓 (양일권이면 쌍)
+        # ④ 함께 취소할 티켓 고르기 (양일권이면 토·일 한 쌍)
+        targets = self._pick_cancel_targets(
             reservation.ticket_type, ticket_id, siblings
         )
-        now = datetime.now(UTC)
-        saved = await self._cancel_targets(
-            targets, now
-        )  # ④ 검사 → 저장, ⑤ 잔여 수량 복구
-        await self._cancel_reservation_if_all_canceled(  # ⑥ 전부 취소됐으면 예매도
-            reservation, siblings, now
+
+        # ⑤ 전부 검사한 뒤 저장하고 잔여 수량을 복구한다
+        now = now_utc()
+        saved = await self._cancel_targets(targets, now)
+
+        # ⑥ 티켓이 전부 취소됐으면 예매도 취소
+        await self._cancel_reservation_if_all_canceled(reservation, siblings, now)
+        return TicketCancelResult(
+            ticket=saved[ticket_id], canceled_ticket_ids=sorted(saved)
         )
-        return saved[ticket_id]
 
     # 티켓 코드로 입장 처리 (당일·상태 규칙은 Ticket.enter가 판단)
     async def enter_ticket(self, ticket_code: UUID) -> Ticket:
         ticket = await self._ticket_repo.find_by_code(ticket_code)
         if ticket is None:
             raise TicketNotFound()
-        ticket.enter(datetime.now(UTC))
+        ticket.enter(now_utc())
         return await self._ticket_repo.save(ticket)
 
     # --- 관리자 ---
@@ -227,6 +241,10 @@ class TicketService:
         by_performance: dict[int, list[Ticket]] = {}
         for t in sorted(siblings, key=lambda t: t.id):
             by_performance.setdefault(t.performance_id, []).append(t)
+
+        # 양일권은 토·일 두 회차의 티켓이 모두 있어야 쌍이 성립한다
+        if len(by_performance) != 2:
+            raise TicketNotCancelable("양일권의 짝이 되는 티켓을 찾을 수 없습니다.")
 
         # 누른 티켓이 자기 회차 안에서 몇 번째인지
         position = next(

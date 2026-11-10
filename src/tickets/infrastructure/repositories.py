@@ -122,6 +122,8 @@ class SqlAlchemyTicketRepository(
             select(TicketModel)
             .where(TicketModel.reservation_id == reservation_id)
             .order_by(TicketModel.id)
+            # 예매 행을 잠근 "뒤"에 읽을 때 세션 캐시(identity map)의 옛 값이 아니라 DB 최신 값을 쓰게 한다
+            .execution_options(populate_existing=True)
         )
         models = (await self._session.scalars(stmt)).all()
         return [_to_domain(model) for model in models]
