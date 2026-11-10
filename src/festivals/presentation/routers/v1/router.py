@@ -11,15 +11,24 @@ from festivals.presentation.schemas import (
     FestivalResponse,
     FestivalUpdate,
 )
+from shared.core.actor import CurrentActor, get_current_actor
 from shared.core.schemas import APIResponse, PageResponse
 from shared.core.time import today_kst
+from users.domain.exceptions import AdminPermissionDenied
 
 router = APIRouter(prefix="/v1/festivals", tags=["festivals"])
 
+# CurrentActorDep, FestivalServiceDep 별칭 설정 - 의존성은 Annotated 방식으로 통일
 # FastAPI가 넣어주는 service (FastAPI가 wiring 등록부를 보고 진짜 service를 넣어준다.)
 # Annotated[타입, Depends(...)]: 타입은 FestivalService, 값은 FastAPI가 Depends로 채움
 # 기본값 자리(= Depends(...))에 쓰지 않으므로 ruff B008 경고가 나지 않고, 5개 API에서 같은 이름으로 재사용
+CurrentActorDep = Annotated[CurrentActor, Depends(get_current_actor)]
 FestivalServiceDep = Annotated[FestivalService, Depends(get_festival_service)]
+
+# 관리자 검사 (티켓 라우터와 같은 방식 : 관리자 전용 API는 라우터에서 막음)
+def _require_admin(actor: CurrentActor) -> None:
+    if not actor.is_admin:
+        raise AdminPermissionDenied()
 
 # 응답 만드는 helper 함수
 # 축제 응답에 계산된 status가 들어갈 수 있도록 추가함.
@@ -34,12 +43,14 @@ def _to_response(festival: Festival) -> FestivalResponse:
     )
 
 # 축제 생성
-# TODO(auth): 관리자 전용 - require_admin 붙이기
 @router.post("", status_code=201, response_model=APIResponse[FestivalResponse])
 async def create_festival(
     body: FestivalCreate, # 사용자가 보낸 JSON, FestivalCreate 스키마로 검사한 뒤 넣어준다. (형식 틀리면 함수 실행 전 422)
     service: FestivalServiceDep,
+    actor: CurrentActorDep,
 ):
+    # 관리자 검사
+    _require_admin(actor)
     # body에 값을 하나씩 꺼내서 넘김.
     # 엔티티 검사, 겹침 검사, 저장은 전부 서비스에서
     # 라우터는 값을 넘기기만 한다.
@@ -90,13 +101,15 @@ async def get_festival(
     return APIResponse.ok(data=_to_response(festival))
 
 # 축제 정보 수정
-# TODO(auth): 관리자 전용 - require_admin 붙이기
 @router.patch("/{festival_id}", response_model=APIResponse[FestivalResponse])
 async def update_festival(
     festival_id: int,
     body: FestivalUpdate,
     service: FestivalServiceDep,
+    actor: CurrentActorDep,
 ):
+    # 관리자 검사
+    _require_admin(actor)
     festival = await service.update_festival(
         festival_id=festival_id,
         name=body.name,
@@ -108,12 +121,15 @@ async def update_festival(
     return APIResponse.ok(data=_to_response(festival))
 
 # 축제 취소
-# TODO(auth): 관리자 전용 - require_admin 붙이기
 @router.patch("/{festival_id}/cancel", response_model=APIResponse[FestivalResponse])
 async def cancel_festival(
     festival_id: int,
     service: FestivalServiceDep,
+    actor: CurrentActorDep,
 ):
+    # 관리자 검사
+    _require_admin(actor)
+
     festival = await service.cancel_festival(
         festival_id=festival_id
     )
