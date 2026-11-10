@@ -14,8 +14,11 @@ Abstract Base Classes ( 추상 기본 클래스 )
 # 파이썬 기본 라이브러리
 from abc import ABC, abstractmethod
 
+from reservations.domain.enums import ReservationStatus
+
 # 프로젝트 코드
 from reservations.domain.reservation import Reservation
+from shared.core.enums import TicketType
 
 
 class ReservationRepository(ABC):
@@ -32,3 +35,27 @@ class ReservationRepository(ABC):
         self, user_id: int
     ) -> list[Reservation]:  # 사용자 한 명은 여러 개의 예매를 가질 수 있음
         """로그인한 사용자의 모든 예매 조회"""
+
+    @abstractmethod
+    async def find_festival_reservation(
+        self,
+        festival_id: int,
+        ticket_types: list[TicketType] | None,
+        statuses: list[ReservationStatus] | None,
+        offset: int,
+        limit: int,
+    ) -> list[Reservation]:
+        """축제별 예매 목록 ( 페이지 하나 분량 )"""
+
+    @abstractmethod
+    async def count_festival_reservation(
+        self,
+        festival_id: int,
+        ticket_types: list[TicketType] | None,
+        statuses: list[ReservationStatus] | None,
+    ) -> int:
+        """축제별 예매 전체 개수"""
+
+    @abstractmethod
+    async def lock(self, reservation_id: int) -> None:
+        """ 예매 행 장금 (SELECT .... FOR UPDATE)"""
