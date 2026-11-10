@@ -12,3 +12,9 @@ class PaymentStatus(StrEnum):
     EXPIRED = "EXPIRED"  # 유효 기간이 지나 종료됨
     ABORTED = "ABORTED"  # 실패가 확정되어 종료됨
     CANCELED = "CANCELED"  # 전액 취소 완료
+
+
+class PaymentRecoveryStatus(StrEnum):
+    CONFIRMATION_PENDING = "CONFIRMATION_PENDING"
+    CANCELLATION_PENDING = "CANCELLATION_PENDING"
+    REFUND_ACCOUNT_REQUIRED = "REFUND_ACCOUNT_REQUIRED"

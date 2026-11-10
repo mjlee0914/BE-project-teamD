@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateTable
 
 from payments.domain.entities import Payment, PaymentLog, ReservationInfo
-from payments.domain.enums import PaymentStatus
+from payments.domain.enums import PaymentRecoveryStatus, PaymentStatus
 from payments.domain.exceptions import (
     PaymentConcurrentUpdate,
     PaymentDuplicateIdentifier,
@@ -171,11 +171,21 @@ class PaymentRepositoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(payment.persistence_token)
         payment.webhook_secret_hash = "a" * 64
         payment.processed_deposit_events = ["event-1"]
+        payment.recovery_status = PaymentRecoveryStatus.CANCELLATION_PENDING
+        payment.recovery_error = "TOSS_NETWORK_ERROR"
+        payment.cancellation_reason = "예매 취소"
+        payment.virtual_account_due_at = datetime.now(UTC).replace(microsecond=0)
         saved = await self.repo.save(payment)
         loaded = await self.repo.find_by_order_id(saved.order_id)
         self.assertNotEqual(loaded.persistence_token, payment.persistence_token)
         self.assertEqual(loaded.webhook_secret_hash, "a" * 64)
         self.assertEqual(loaded.processed_deposit_events, ["event-1"])
+        self.assertEqual(
+            loaded.recovery_status, PaymentRecoveryStatus.CANCELLATION_PENDING
+        )
+        self.assertEqual(loaded.recovery_error, "TOSS_NETWORK_ERROR")
+        self.assertEqual(loaded.cancellation_reason, "예매 취소")
+        self.assertEqual(loaded.virtual_account_due_at, payment.virtual_account_due_at)
         self.assertIsNone(await self.repo.find_by_order_id("missing-order"))
 
     async def test_stale_domain_update_is_rejected(self):

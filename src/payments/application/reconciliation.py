@@ -1,7 +1,8 @@
 # 파일 역할: 수동 재조회와 웹훅이 공유하는 결과 반영 절차다. 같은 주문인지 확인한 후 도메인 상태를 갱신한다.
 
 from payments.domain.entities import Payment
-from payments.domain.exceptions import PaymentIdentityConflict
+from payments.domain.enums import PaymentStatus
+from payments.domain.exceptions import PaymentIdentityConflict, PaymentStatusException
 from payments.domain.service import PaymentSnapshot
 
 
@@ -16,6 +17,12 @@ def apply_snapshot(payment: Payment, snapshot: PaymentSnapshot) -> None:
         )
     ):
         raise PaymentIdentityConflict
+    # 승인 응답이 유실된 결제의 아직 처리 중인 결과는 완료·실패로 단정하지 않는다.
+    if snapshot.status in (PaymentStatus.READY, PaymentStatus.IN_PROGRESS):
+        if payment.status != PaymentStatus.IN_PROGRESS:
+            raise PaymentStatusException
+        payment.add_payment_log(snapshot.log)
+        return
     # 소유가 다른 결과를 걸러낸 뒤 도메인의 상태 전이 검사로 넘어간다.
     payment.synchronize(
         status=snapshot.status,

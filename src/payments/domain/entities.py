@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from payments.domain.enums import PaymentStatus
+from payments.domain.enums import PaymentRecoveryStatus, PaymentStatus
 from payments.domain.exceptions import (
     InvalidAmountException,
     PaymentKeyNotFoundException,
@@ -48,6 +48,11 @@ class Payment:
     processed_deposit_events: list[str] = field(default_factory=list, repr=False)
     # DB 저장 당시 행을 비교할 메모리용 표식이다. ERD의 새 컬럼으로 저장하지 않는다.
     persistence_token: str | None = field(default=None, repr=False, compare=False)
+    # 복구 요청은 기존 payment_log 메타데이터에 저장한다. 환불계좌 원문은 보관하지 않는다.
+    recovery_status: PaymentRecoveryStatus | None = None
+    recovery_error: str | None = None
+    cancellation_reason: str | None = None
+    virtual_account_due_at: datetime | None = None
 
     # 양의 정수 금액만 허용하고 READY 상태의 새 결제를 만든다. DB 저장은 호출자가 수행한다.
     @classmethod
