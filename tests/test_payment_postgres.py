@@ -32,6 +32,9 @@ from payments.domain.service import (
     PaymentSnapshot,
     RefundAccount,
 )
+from payments.infrastructure.access_checker import (
+    SQLAlchemyPaymentCreationContextProvider,
+)
 from payments.infrastructure.models import PaymentModel
 from payments.infrastructure.sqlalchemy_repository import SQLAlchemyPaymentRepository
 from reservations.infrastructure.models import Reservation as ReservationModel
@@ -90,7 +93,7 @@ class PaymentPostgresTests(unittest.IsolatedAsyncioTestCase):
         await self.connection.run_sync(
             lambda connection: Base.metadata.create_all(connection, tables=tables)
         )
-        user_id = await self.connection.scalar(
+        self.user_id = await self.connection.scalar(
             insert(Base.metadata.tables["users"])
             .values(
                 email="test@example.com",
@@ -120,7 +123,7 @@ class PaymentPostgresTests(unittest.IsolatedAsyncioTestCase):
                 expires_at=datetime.now(UTC) + timedelta(hours=1),
                 festival_name="Test Festival",
                 venue="Test Venue",
-                user_id=user_id,
+                user_id=self.user_id,
                 festival_id=festival_id,
             )
             .returning(ReservationModel.id)
@@ -221,8 +224,12 @@ class PaymentPostgresTests(unittest.IsolatedAsyncioTestCase):
         processor.approve.side_effect = PaymentProcessingError(
             "timeout", outcome_unknown=True
         )
-        service = PaymentService(processor, self.repository)
-        payment = await service.create(self.reservation_id, "Test Festival", 1000)
+        service = PaymentService(
+            processor,
+            self.repository,
+            SQLAlchemyPaymentCreationContextProvider(self.session),
+        )
+        payment = await service.create(self.reservation_id, self.user_id)
         with self.assertRaises(PaymentProcessingError):
             await service.approve(payment.payment_id, "uncertain-key", 1000)
         # 실제 API가 502 응답을 반환할 때 요청 세션에서 수행할 commit을 모사한다.
@@ -236,8 +243,12 @@ class PaymentPostgresTests(unittest.IsolatedAsyncioTestCase):
         import hashlib
 
         processor = AsyncMock(spec=PaymentProcessor)
-        service = PaymentService(processor, self.repository)
-        payment = await service.create(self.reservation_id, "Test Festival", 1000)
+        service = PaymentService(
+            processor,
+            self.repository,
+            SQLAlchemyPaymentCreationContextProvider(self.session),
+        )
+        payment = await service.create(self.reservation_id, self.user_id)
         processor.approve.return_value = PaymentApprovalResult(
             PaymentStatus.WAITING_FOR_DEPOSIT,
             None,
@@ -247,7 +258,9 @@ class PaymentPostgresTests(unittest.IsolatedAsyncioTestCase):
         )
         waiting = await service.approve(payment.payment_id, "test-key", 1000)
         self.assertEqual(waiting.status, PaymentStatus.WAITING_FOR_DEPOSIT)
-        second = await service.create(self.reservation_id, "Test Festival", 1000)
+        second = await self.repository.save(
+            Payment.create(self.reservation_id, "Test Festival", 1000)
+        )
         with self.assertRaises(PaymentAttemptConflict):
             await service.approve(second.payment_id, "another-key", 1000)
         now = datetime.now(UTC)

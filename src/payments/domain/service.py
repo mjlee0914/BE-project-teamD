@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 
 from payments.domain.entities import PaymentLog
 from payments.domain.enums import PaymentStatus
@@ -63,7 +64,7 @@ class PaymentCreationContext:
     user_id: int
     festival_name: str
     amount: int
-    reservation_status: str
+    reservation_status: StrEnum
     expires_at: datetime | None
 
 

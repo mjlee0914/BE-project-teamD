@@ -8,7 +8,12 @@ from auth.application.service import AuthService
 from auth.domain.entities import TokenPayload
 from payments.application.service import PaymentService
 from payments.domain.entities import Payment
-from payments.domain.exceptions import PaymentNotFoundException, PaymentProcessingError
+from payments.domain.exceptions import (
+    PaymentAttemptConflict,
+    PaymentNotFoundException,
+    PaymentProcessingError,
+    PaymentStatusException,
+)
 from payments.domain.service import PaymentAccessChecker, RefundAccount
 from payments.presentation.dependencies import (
     provide_auth_service,
@@ -92,6 +97,40 @@ class PaymentAPITests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(response.status_code, 422)
         self.service.create.assert_not_awaited()
+
+    async def test_create_maps_owner_conflict_duplicate_and_invalid_reservation(self):
+        scenarios = (
+            ("other owner", ForbiddenException(), 403, "FORBIDDEN"),
+            (
+                "duplicate attempt",
+                PaymentAttemptConflict(),
+                409,
+                "PAYMENT_ATTEMPT_CONFLICT",
+            ),
+            (
+                "expired reservation",
+                PaymentStatusException(),
+                422,
+                "PAYMENT_STATUS_NOT_CHANGEABLE",
+            ),
+            (
+                "non-pending reservation",
+                PaymentStatusException(),
+                422,
+                "PAYMENT_STATUS_NOT_CHANGEABLE",
+            ),
+        )
+        for scenario, error, status, code in scenarios:
+            with self.subTest(scenario=scenario):
+                self.service.create.side_effect = error
+                response = await self.client.post(
+                    "/v1/payments",
+                    json={"reservation_id": 1},
+                    headers=self.headers,
+                )
+                self.assertEqual(response.status_code, status)
+                self.assertEqual(response.json()["code"], code)
+        self.service.create.side_effect = None
 
     async def test_missing_token_is_rejected(self):
         response = await self.client.get("/v1/payments/7")

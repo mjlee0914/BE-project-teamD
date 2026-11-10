@@ -1,9 +1,12 @@
 # 파일 역할: 결제 업무의 실행 순서를 조율한다. 저장소·도메인 규칙·결제사 어댑터를 사용하며 HTTP나 SQL을 직접 작성하지 않는다.
 
+from datetime import UTC
+
 from payments.application.reconciliation import apply_snapshot
 from payments.domain.entities import Payment
 from payments.domain.enums import PaymentStatus
 from payments.domain.exceptions import (
+    InvalidAmountException,
     InvalidRefundAccount,
     PaymentAttemptConflict,
     PaymentIdentityConflict,
@@ -13,22 +16,33 @@ from payments.domain.exceptions import (
 )
 from payments.domain.repository import PaymentRepository
 from payments.domain.service import (
+    PaymentCreationContext,
     PaymentCreationContextProvider,
     PaymentProcessor,
     RefundAccount,
 )
+from reservations.domain.enums import ReservationStatus
 from shared.core.exceptions import ForbiddenException
 from shared.core.time import now_utc
 
 
 # 결제 상태 변경의 순서를 관리한다. 소유권 검사는 이 서비스 호출 전 API 의존성에서 수행한다.
 class PaymentService:
+    ACTIVE_STATUSES = frozenset(
+        {
+            PaymentStatus.READY,
+            PaymentStatus.IN_PROGRESS,
+            PaymentStatus.WAITING_FOR_DEPOSIT,
+            PaymentStatus.DONE,
+        }
+    )
+
     # 외부에서 전달받은 의존성을 보관한다. 여기서 DB 연결이나 업무 처리를 새로 시작하지 않는다.
     def __init__(
         self,
         processor: PaymentProcessor,
         payment_repo: PaymentRepository,
-        creation_context_provider: PaymentCreationContextProvider | None = None,
+        creation_context_provider: PaymentCreationContextProvider,
     ):
         self.processor = processor
         self.payment_repo = payment_repo
@@ -58,18 +72,14 @@ class PaymentService:
         ):
             return payment
         payment.ensure_approvable(payment_key, amount)
+        await self._ensure_reservation_payable(payment.reservation.reservation_id)
         attempts = await self.payment_repo.find_by_reservation_id(
             payment.reservation.reservation_id
         )
         # 같은 예매에 다른 진행 중·완료 시도가 있으면 새 승인으로 중복 결제하지 못하게 한다.
         if any(
             attempt.payment_id != payment_id
-            and attempt.status
-            in (
-                PaymentStatus.IN_PROGRESS,
-                PaymentStatus.WAITING_FOR_DEPOSIT,
-                PaymentStatus.DONE,
-            )
+            and attempt.status in self.ACTIVE_STATUSES - {PaymentStatus.READY}
             for attempt in attempts
         ):
             raise PaymentAttemptConflict
@@ -135,34 +145,61 @@ class PaymentService:
         payment.cancel(result.canceled_at, result.log)
         return await self.payment_repo.save(payment)
 
-    # 신뢰할 수 있는 예매 정보·금액으로 새 결제 시도를 저장한다. 클라이언트용 공개 생성 API는 아니다.
-    async def create(self, reservation_id: int, user_id: int) -> Payment:
-        if self.creation_context_provider is None:
-            raise RuntimeError("결제 생성용 예매 정보 공급자가 연결되지 않았습니다.")
-        await self.payment_repo.lock_reservation(reservation_id)
+    # Create a payment attempt from trusted reservation data.
+    async def _get_owned_reservation_context(
+        self, reservation_id: int, user_id: int
+    ) -> PaymentCreationContext:
         context = await self.creation_context_provider.get_context(reservation_id)
         if context is None or context.user_id != user_id:
-            raise ForbiddenException("본인의 예매에 연결된 결제만 생성할 수 있습니다.")
-        if context.reservation_status != "PENDING":
+            raise ForbiddenException("본인 예매에 연결된 결제만 처리할 수 있습니다.")
+        return context
+
+    @staticmethod
+    def _validate_reservation_payable(context: PaymentCreationContext) -> None:
+        if context.reservation_status != ReservationStatus.PENDING:
+            raise PaymentStatusException("대기 중인 예매만 결제할 수 있습니다.")
+        expires_at = context.expires_at
+        if expires_at is None:
+            raise PaymentStatusException("예매 만료 시각이 없어 결제할 수 없습니다.")
+        # Some database drivers return naive values even for timezone-aware columns.
+        # Interpret stored naive timestamps as UTC before comparing.
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        if expires_at <= now_utc():
             raise PaymentStatusException(
-                "결제는 대기 중인 예매에서만 생성할 수 있습니다."
+                "예매 대기 시간이 만료되어 결제할 수 없습니다."
             )
-        if context.expires_at is None or context.expires_at <= now_utc():
-            raise PaymentStatusException(
-                "예매 대기 시간이 만료되어 결제를 생성할 수 없습니다."
+
+    async def _ensure_reservation_payable(self, reservation_id: int) -> None:
+        context = await self.creation_context_provider.get_context(reservation_id)
+        if context is None:
+            raise PaymentStatusException("결제에 연결된 예매를 찾을 수 없습니다.")
+        self._validate_reservation_payable(context)
+
+    async def create(self, reservation_id: int, user_id: int) -> Payment:
+        # Check ownership before taking a row lock for another user's reservation.
+        context = await self._get_owned_reservation_context(reservation_id, user_id)
+        await self.payment_repo.lock_reservation(reservation_id)
+        # Reload after locking so concurrent status and expiry updates are observed.
+        context = await self._get_owned_reservation_context(reservation_id, user_id)
+        self._validate_reservation_payable(context)
+        if context.amount <= 0:
+            raise InvalidAmountException(
+                "결제 금액이 0원이면 결제 시도를 만들 수 없습니다."
             )
         attempts = await self.payment_repo.find_by_reservation_id(reservation_id)
         if any(
-            attempt.status
-            in (
-                PaymentStatus.READY,
-                PaymentStatus.IN_PROGRESS,
-                PaymentStatus.WAITING_FOR_DEPOSIT,
-                PaymentStatus.DONE,
-            )
+            attempt.status in self.ACTIVE_STATUSES - {PaymentStatus.READY}
             for attempt in attempts
         ):
             raise PaymentAttemptConflict
+        # Reuse a READY order when the client retries after closing the checkout.
+        ready_attempt = next(
+            (attempt for attempt in attempts if attempt.status == PaymentStatus.READY),
+            None,
+        )
+        if ready_attempt is not None:
+            return ready_attempt
         payment = Payment.create(
             reservation_id=reservation_id,
             festival_name=context.festival_name,

@@ -38,7 +38,9 @@ class SQLAlchemyPaymentCreationContextProvider(PaymentCreationContextProvider):
 
     async def get_context(self, reservation_id: int) -> PaymentCreationContext | None:
         result = await self._session.execute(
-            select(ReservationModel).where(ReservationModel.id == reservation_id)
+            select(ReservationModel)
+            .where(ReservationModel.id == reservation_id)
+            .execution_options(populate_existing=True)
         )
         reservation = result.scalar_one_or_none()
         if reservation is None:
@@ -48,6 +50,6 @@ class SQLAlchemyPaymentCreationContextProvider(PaymentCreationContextProvider):
             user_id=reservation.user_id,
             festival_name=reservation.festival_name,
             amount=reservation.final_price,
-            reservation_status=reservation.status.value,
+            reservation_status=reservation.status,
             expires_at=reservation.expires_at,
         )
