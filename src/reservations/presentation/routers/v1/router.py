@@ -24,12 +24,9 @@ from fastapi import APIRouter, Depends, Query, status
 # 프로젝트 코드
 from reservations.application.service import ReservationService
 from reservations.domain.enums import ReservationStatus
-from reservations.presentation.dependencies import (
-    CurrentActor,
-    get_current_actor,
-    provide_reservation_service,
-)
+from reservations.presentation.dependencies import provide_reservation_service
 from reservations.presentation.schemas import ReservationCreate, ReservationResponse
+from shared.core.actor import CurrentActor, get_current_actor
 from shared.core.enums import TicketType
 from shared.core.schemas import APIResponse, PageResponse
 from users.domain.exceptions import AdminPermissionDenied
