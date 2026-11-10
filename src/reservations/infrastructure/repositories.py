@@ -116,7 +116,6 @@ class SqlalchemyReservationRepository(ReservationRepository):
         )
         await self.session.execute(stmt)
 
-
     # 예매 저장
     async def save(self, reservation: Reservation) -> Reservation:
         if reservation.id is not None:  # 예매가 존재하면 수정
@@ -207,7 +206,7 @@ class SqlalchemyReservationRepository(ReservationRepository):
         return result.scalar_one()
 
     # [작업 3] 입금 기한이 지난 PENDING 예매 조회
-    # - with_for_update(skip_locked=True) : 결제 확정이 같은 예매를 잡고 있으면 이번엔 건너뜀
+    # - with_for_update(skip_locked=True) : 결제 확정(lock)이 같은 예매를 잡고 있으면 이번엔 건너뜀
     #   → 입금 확정과 만료가 동시에 일어나 상태가 꼬이는 것을 막는다 (다음 주기에 다시 검사)
     async def find_overdue_pending(self, now: datetime) -> list[Reservation]:
         stmt = (
@@ -217,6 +216,29 @@ class SqlalchemyReservationRepository(ReservationRepository):
                 ReservationModel.expires_at < now,
             )
             .with_for_update(skip_locked=True)
+        )
+        models = (await self.session.scalars(stmt)).all()
+        return [self._to_entity(model) for model in models]
+
+    # [작업 4] 축제의 진행 중 예매를 잠그면서 조회
+    # - with_for_update : 다른 요청이 잡고 있으면 끝날 때까지 기다린 뒤 최신 상태로 다시 검사
+    #   → 그사이 취소·만료된 예매는 조건(status)에서 빠짐
+    # - populate_existing : 세션에 이미 읽어 둔 예매가 있어도 DB 값으로 덮어써서 오래된 상태를 쓰지 않음
+    async def find_active_by_festival_for_update(
+        self, festival_id: int, ticket_types: list[TicketType]
+    ) -> list[Reservation]:
+        stmt = (
+            select(ReservationModel)
+            .where(
+                ReservationModel.festival_id == festival_id,
+                ReservationModel.ticket_type.in_(ticket_types),
+                ReservationModel.status.in_(
+                    [ReservationStatus.PENDING, ReservationStatus.CONFIRMED]
+                ),
+            )
+            .order_by(ReservationModel.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
         models = (await self.session.scalars(stmt)).all()
         return [self._to_entity(model) for model in models]

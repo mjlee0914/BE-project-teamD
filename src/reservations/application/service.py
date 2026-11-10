@@ -53,9 +53,6 @@ from shared.core.enums import TicketType
 from shared.core.time import KST, now_utc, today_kst
 from users.domain.exceptions import AdminPermissionDenied
 
-# 진행 중인 예매 상태 : 공연 취소 시 일괄 취소 대상
-ACTIVE_STATUSES = [ReservationStatus.PENDING, ReservationStatus.CONFIRMED]
-
 # 잔여 수량을 되돌릴 수 있는 공연 상태
 # - 취소·종료된 공연은 공연 엔티티가 복구를 거부(409)하므로 미리 걸러서 건너뛴다
 RESTORABLE_STATUSES = (PerformanceStatus.OPEN, PerformanceStatus.SOLD_OUT)
@@ -276,7 +273,10 @@ class ReservationService:
     # [작업 2] 입금 완료 → 예매 확정
     # - 결제 쪽이 입금 확인(웹훅)에 성공했을 때 "같은 세션"으로 호출해야 함
     # - 입금 기한이 지났거나 PENDING이 아니면 엔티티가 409를 던짐
+    # - 행을 잠근 뒤 조회 → 만료 작업(skip_locked)이 이 예매를 건너뛰고,
+    #   취소와 동시에 들어와도 한쪽이 끝난 뒤 처리됨
     async def confirm_reservation(self, reservation_id: int) -> Reservation:
+        await self._reservation_repo.lock(reservation_id)
         reservation = await self._reservation_repo.find_by_id(reservation_id)
         if reservation is None:
             raise ReservationNotFound()
@@ -301,17 +301,20 @@ class ReservationService:
     # - 양일권은 부분 취소 없이 전체 취소, 남은 요일 수량만 복구 (_restore_remaining이 처리)
     # - 사용자 취소 마감과 상관없이 취소 (관리자 결정이므로)
     async def cancel_by_performance(self, performance: Performance) -> int:
+        # 회차 요일 → 취소 대상 티켓 종류 (토·일이 아닌 회차는 예매 대상이 아니므로 0건)
         weekday = performance.starts_at.astimezone(KST).weekday()
-        day = TicketType.SAT if weekday == 5 else TicketType.SUN
-        ticket_types = [day, TicketType.BOTH]
-
-        total = await self._reservation_repo.count_festival_reservation(
-            performance.festival_id, ticket_types, ACTIVE_STATUSES
-        )
-        if total == 0:
+        if weekday == 5:
+            day = TicketType.SAT
+        elif weekday == 6:
+            day = TicketType.SUN
+        else:
             return 0
-        targets = await self._reservation_repo.find_festival_reservation(
-            performance.festival_id, ticket_types, ACTIVE_STATUSES, 0, total
+
+        # 진행 중 예매를 "잠그면서" 조회
+        # - 사용자 취소·결제 확정과 동시에 일어나도 한쪽이 끝난 뒤 최신 상태로 다시 읽음
+        #   → 이미 취소된 예매를 또 취소해 잔여 수량을 두 번 복구하는 일을 막음
+        targets = await self._reservation_repo.find_active_by_festival_for_update(
+            performance.festival_id, [day, TicketType.BOTH]
         )
 
         now = now_utc()
