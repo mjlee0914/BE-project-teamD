@@ -7,6 +7,8 @@ from festivals.infrastructure.repositories import SqlAlchemyFestivalRepository
 from performances.application.service import PerformanceService
 from performances.infrastructure.repositories import SqlAlchemyPerformanceRepository
 from performances.presentation.dependencies import get_performance_service
+from reservations.application.service import ReservationService
+from reservations.infrastructure.repositories import SqlalchemyReservationRepository
 from shared.core.database import get_db
 
 
@@ -14,8 +16,13 @@ def build_performance_service(
         session: Annotated[AsyncSession, Depends(get_db)],
 ) -> PerformanceService:
     return PerformanceService(
-        SqlAlchemyPerformanceRepository(session),
-        SqlAlchemyFestivalRepository(session)
+        performance_repo=SqlAlchemyPerformanceRepository(session),
+        festival_repo=SqlAlchemyFestivalRepository(session),
+        reservation_service=ReservationService(
+            reservation_repo=SqlalchemyReservationRepository(session),
+            festival_repo=SqlAlchemyFestivalRepository(session),
+            performance_repo=SqlAlchemyPerformanceRepository(session),
+            )
     )
 
 def wire_performance_dependencies(app: FastAPI) -> None:
