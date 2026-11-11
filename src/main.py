@@ -33,13 +33,14 @@ from reservations.presentation.routers.v1.router import (
 )
 from reservations.presentation.routers.v1.router import router as reservation_router
 from shared.core.exception_handlers import register_exception_handlers
+from tickets.infrastructure.expire_job import start_ticket_expire_job
 from tickets.presentation.routers.v1.router import router as ticket_router
 from users.presentation.routers.v1.router import router as user_router
 from wiring import wire_dependencies
 
 
 # 서버 시작·종료 시 할 일
-# - 시작 : 입금 기한 지난 예매를 만료시키는 주기 작업 실행 (#134)
+# - 시작 : 입금 기한 지난 예매를 만료시키는 주기 작업 (#134), 공연이 끝난 티켓을 만료시키는 주기 작업 (#146)
 # - 종료 : 주기 작업 멈추기
 @asynccontextmanager
 async def lifespan(app: FastAPI):

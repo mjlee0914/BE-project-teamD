@@ -2,6 +2,7 @@
 # 추상 클래스, abstractmethod <- 자식클래스가 구현해야한다는 뜻
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from uuid import UUID
 
 from tickets.domain.enums import TicketStatus
@@ -79,6 +80,11 @@ class TicketRepository(ABC):
         self, performance_id: int | None, status: TicketStatus | None
     ) -> int:
         """관리자 검색 조건에 맞는 티켓 개수."""
+
+    # 만료 대상: 공연이 끝났고 아직 CANCELED·EXPIRED가 아닌 티켓 (주기 작업이 사용)
+    @abstractmethod
+    async def find_all_to_expire(self, now: datetime) -> list[Ticket]:
+        """performance_end_at이 now 이전(또는 같은)이고 CANCELED·EXPIRED가 아닌 티켓을 반환한다."""
 
     # 입장 현황
     @abstractmethod

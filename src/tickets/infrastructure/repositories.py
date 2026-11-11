@@ -1,4 +1,6 @@
 # 도메인에 작성한 설계도 구현
+
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -213,14 +215,40 @@ class SqlAlchemyTicketRepository(
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
-    # 입장 현황
-    async def count_by_status(self, performance_id: int) -> dict[TicketStatus, int]:
+    # 만료 대상 조회: 공연이 끝났고 아직 CANCELED·EXPIRED가 아닌 티켓 (PENDING·ISSUED·USED 모두)
+    # - with_for_update(skip_locked=True): 다른 요청이 잡고 있는 행은 건너뜀
+    #   → 취소 등과 같은 티켓을 동시에 바꾸지 않고, 건너뛴 티켓은 다음 주기에 처리된다
+    async def find_all_to_expire(self, now: datetime) -> list[Ticket]:
         stmt = (
-            select(TicketModel.status, func.count())
+            select(TicketModel)
+            .where(
+                TicketModel.status.notin_(
+                    [TicketStatus.CANCELED.value, TicketStatus.EXPIRED.value]
+                ),
+                TicketModel.performance_end_at <= now,
+            )
+            .with_for_update(skip_locked=True)
+        )
+        models = (await self._session.scalars(stmt)).all()
+        return [_to_domain(model) for model in models]
+
+    # 입장 현황
+    # - USED는 상태가 아니라 used_at으로 센다: 공연이 끝나면 USED도 EXPIRED로 바뀌기 때문
+    #   (used_at은 만료돼도 남는다) → used_at이 있으면 입장한 티켓
+    # - EXPIRED는 "입장하지 않고 만료된" 티켓만 센다 (입장한 티켓은 USED로 센다)
+    # - ISSUED·PENDING·CANCELED는 지금처럼 상태로 센다
+    async def count_by_status(self, performance_id: int) -> dict[TicketStatus, int]:
+        entered = TicketModel.used_at.is_not(None)  # 입장했는지 (used_at이 있는지)
+        stmt = (
+            select(TicketModel.status, entered.label("entered"), func.count())
             .where(TicketModel.performance_id == performance_id)
-            .group_by(TicketModel.status)
+            .group_by(TicketModel.status, entered)
         )
         result = await self._session.execute(stmt)
-        counts = {TicketStatus(status): n for status, n in result.all()}
+
         # 없는 상태도 0으로 채워서 모든 상태를 돌려준다
-        return {status: counts.get(status, 0) for status in TicketStatus}
+        counts = {status: 0 for status in TicketStatus}
+        for status, was_entered, n in result.all():
+            key = TicketStatus.USED if was_entered else TicketStatus(status)
+            counts[key] += n
+        return counts
