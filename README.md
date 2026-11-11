@@ -1,16 +1,31 @@
-# BE-project-teamD
+# 🎸 KAROCKFE — KANT ROCK FESTIVAL
 
-## 👥 팀원
+![alt text](<ChatGPT Image Nov 11, 2026, 11_14_30 AM.png>)
+
+> **공연은 무대에서, 예매는 코드로.**  
+> 카락페는 콘서트 예매 시스템의 백엔드를 구현하는 D팀 프로젝트입니다.
+
+관객이 공연을 발견하고 티켓을 예매하는 순간까지.  
+회원·인증·공연·축제·티켓·예매·결제 도메인이 하나의 무대를 완성합니다.
+
+---
+
+## 🤘 THE CREW
+
+각자의 도메인을 연주하는 다섯 명의 백엔드 크루입니다.
 
 |                         리더                          |                          부리더                           |                           서기                           |                           부서기                           |                         팀원                         |
 | :---------------------------------------------------: | :-------------------------------------------------------: | :------------------------------------------------------: | :--------------------------------------------------------: | :--------------------------------------------------: |
 | <img src="https://github.com/tuski0.png" width="100"> | <img src="https://github.com/justinweon.png" width="100"> | <img src="https://github.com/mjlee0914.png" width="100"> | <img src="https://github.com/aiagentohms.png" width="100"> | <img src="https://github.com/jsa00.png" width="100"> |
 |                        선병철                         |                          원정린                           |                          이명지                          |                           오명석                           |                        조성아                        |
+|                      예매 도메인                      |                        티켓 도메인                        |                     공연·축제 도메인                     |                      인증·결제 도메인                      |                     회원 도메인                      |
 |         [@tuski0](https://github.com/tuski0)          |       [@justinweon](https://github.com/justinweon)        |        [@mjlee0914](https://github.com/mjlee0914)        |       [@aiagentohms](https://github.com/aiagentohms)       |          [@jsa00](https://github.com/jsa00)          |
 
 <br>
 
-## 🛠 기술 스택
+## ⚡ OUR GEAR
+
+카락페의 무대를 움직이는 백엔드 장비입니다.
 
 | 분류          | 기술                                       |
 | ------------- | ------------------------------------------ |
@@ -23,20 +38,22 @@
 
 <br>
 
-## 목차
+## 🎫 SETLIST
 
-- [시작하기](#-시작하기)
-- [작업 흐름](#-작업-흐름)
-- [python & uv 규칙](#-python--uv-규칙)
+- [공연 시작하기](#-공연-시작하기)
+- [우리의 작업 흐름](#-우리의-작업-흐름)
+- [Python · uv 규칙](#-python--uv-규칙)
 - [ruff 사용법](#-ruff-사용법)
 - [Docker 명령어](#-docker-명령어)
-- [DB 연결 문제 해결](#-db-연결-문제-해결)
+- [DB 연결 트러블슈팅](#-db-연결-트러블슈팅)
 
 <br>
 
-## 🚀 시작하기
+## 🚀 공연 시작하기
 
-1. 저장소 clone 및 패키지 설치
+카락페 백엔드 무대를 로컬 환경에 세팅합니다.
+
+### 1. 저장소 Clone 및 패키지 설치
 
 ```bash
 git clone https://github.com/mjlee0914/BE-project-teamD.git
@@ -44,45 +61,59 @@ cd BE-project-teamD
 uv sync
 ```
 
-2. 환경 변수 파일 생성 (값은 그대로 사용 가능)
+### 2. 환경 변수 파일 준비
+
+`.env.example`을 복사해 로컬 환경 변수 파일을 만듭니다.
 
 ```bash
 cp .env.example .env
 ```
 
-3. DB(PostgreSQL) 컨테이너 실행 (Docker Desktop이 켜져 있어야 함)
+### 3. PostgreSQL 컨테이너 실행
+
+먼저 Docker Desktop이 실행 중인지 확인합니다.
 
 ```bash
-docker compose up -d   # 컨테이너 생성 및 실행
-docker compose ps      # STATUS가 Up이면 정상
+docker compose up -d
+docker compose ps
 ```
 
-4. 서버 실행 (프로젝트 루트에서)
+`STATUS`가 `Up`이라면 DB 준비 완료입니다.
+
+### 4. FastAPI 서버 실행
+
+프로젝트 루트에서 다음 명령어를 실행합니다.
 
 ```bash
 uv run uvicorn main:app --app-dir src --reload
 ```
 
+서버가 올라왔다면 카락페 공연 시작입니다. 🤘
+
 <br>
 
-## 🔄 작업 흐름
+## 🔄 우리의 작업 흐름
 
-**이슈 만들기 → 브랜치 만들기 → 작업·커밋 → PR 올리기 → 리뷰·머지**
+> **ISSUE → BRANCH → CODE → COMMIT → PR → REVIEW → MERGE**
 
-> ⚠️ `dev`에 바로 push 금지. 항상 브랜치를 만들어 PR로 올릴 것.
+각자 다른 파트를 연주해도 최종 무대는 하나입니다.  
+작업 기록과 리뷰 흐름을 지키며 `dev` 브랜치에 코드를 합칩니다.
 
-### 1. ISSUE 생성하기
+> ⚠️ `dev`에 바로 push하지 않습니다.  
+> 반드시 작업 브랜치를 만들고 PR을 통해 합칩니다.
 
-상단 ISSUE 탭에서 양식에 맞춰 생성하고 이슈 번호 부여 받기
+### 1. ISSUE — 오늘 연주할 파트 정하기
 
-### 2. 브랜치 만들기
+GitHub의 **Issues** 탭에서 양식에 맞춰 이슈를 생성하고 번호를 발급받습니다.
 
-`dev`를 최신으로 받은 다음, 이슈 종류와 번호로 브랜치 생성
+### 2. BRANCH — 나만의 스테이지 만들기
+
+`dev` 브랜치를 최신 상태로 맞춘 후, 이슈 종류와 번호를 사용해 브랜치를 만듭니다.
 
 ```bash
 git switch dev
 git pull origin dev
-uv sync                # 다른 팀원이 추가한 패키지까지 설치
+uv sync
 git switch -c feat/12-email-login
 ```
 
@@ -92,7 +123,7 @@ git switch -c feat/12-email-login
 | 수정 | `fix/15-login-error`  |
 | 기타 | `chore/18-uv-setup`   |
 
-### 3. 작업하고 push 하기
+### 3. COMMIT & PUSH — 작업 기록 남기기
 
 ```bash
 git add .
@@ -100,168 +131,217 @@ git commit -m "feat: 이메일 로그인 API 연동"
 git push -u origin feat/12-email-login
 ```
 
-> 💡 커밋 메시지는 `.`처럼 비워두지 말고 무엇을 했는지 적을 것. 나중에 기록을 볼 때 훨씬 편함.
+> 💡 커밋 메시지는 작업 내용을 알아볼 수 있도록 작성합니다.  
+> 의미 없는 `.` 대신, 어떤 코드를 연주했는지 기록해 주세요.
 
-### 4. PR 올리기
+### 4. PULL REQUEST — 합주 요청하기
 
-1. push 직후 GitHub 저장소에 들어가면 노란 배너의 **Compare & pull request** 버튼 클릭
-   - 버튼이 없으면 **Pull requests** 탭 → **New pull request** → `base: dev` ← `compare: 내 브랜치` 선택
-   - `base: dev` ← `compare: dev`이면 비교할 게 없어서 PR을 만들 수 없음. compare를 꼭 내 브랜치로 변경
-2. 본문에 자동으로 채워진 PR 템플릿을 항목별로 작성
-3. 오른쪽 사이드바에서 **Assignees(본인)**, **Reviewers(팀원)**를 지정하고 **Create pull request** 클릭
+1. Push 후 GitHub 저장소의 **Compare & pull request**를 클릭합니다.
+   - 버튼이 없다면 **Pull requests → New pull request**로 이동합니다.
+   - `base: dev` ← `compare: 내 브랜치`인지 확인합니다.
+   - `base`와 `compare`가 모두 `dev`라면 비교할 작업이 없어 PR을 만들 수 없습니다.
+2. 자동으로 표시되는 PR 템플릿을 항목별로 작성합니다.
+3. **Assignees**에는 본인을, **Reviewers**에는 팀원을 지정합니다.
+4. **Create pull request**를 클릭해 리뷰를 요청합니다.
 
-#### PR 템플릿 작성 요령
+#### PR 템플릿 작성 가이드
 
-| 항목                              | 작성 방법                                                                                                |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| 🔗 관련 이슈                      | `close #12`처럼 이슈 번호 작성. `dev`에 머지되면 이슈가 자동으로 닫힘. 여러 개면 줄을 나눠 작성 |
-| 📝 작업 내용                      | 무엇을 했는지 작성. 예: 로그인 API 연동 / 입력값 검증 추가                                             |
-| 💡 고민한 점 / 리뷰 포인트 (선택) | 왜 이렇게 만들었는지, 리뷰어가 특히 봐줬으면 하는 부분 작성                                         |
-| 🧪 확인 방법                      | 리뷰어가 따라 할 수 있게 작성. 예: Swagger(`/docs`)에서 틀린 비밀번호로 로그인 → 401 응답 확인         |
-| 📷 스크린샷 (선택)                | Swagger 응답이나 터미널 로그를 드래그해서 붙여넣기                                                    |
-| ✔️ 체크리스트                     | 올리기 전에 하나씩 확인하고 `[ ]`를 `[x]`로 변경                                                      |
+| 항목                       | 작성 방법                                                                   |
+| -------------------------- | --------------------------------------------------------------------------- |
+| 🔗 관련 이슈               | `close #12` 형식으로 작성합니다. `dev`에 머지되면 이슈가 자동으로 닫힙니다. |
+| 📝 작업 내용               | 어떤 기능을 구현하거나 수정했는지 작성합니다.                               |
+| 💡 고민한 점 / 리뷰 포인트 | 구현 이유와 리뷰어가 집중해서 확인할 부분을 작성합니다.                     |
+| 🧪 확인 방법               | 리뷰어가 같은 결과를 재현할 수 있도록 작성합니다.                           |
+| 📷 스크린샷                | 필요한 경우 Swagger 응답이나 터미널 로그를 첨부합니다.                      |
+| ✔️ 체크리스트              | 제출 전 `[ ]`를 `[x]`로 바꾸며 확인합니다.                                  |
 
-#### 체크리스트
+#### 무대에 오르기 전 체크리스트
 
-- [ ] Assignees에 본인 지정
-- [ ] Reviewers에 팀원 지정
-- [ ] `uv run uvicorn main:app --app-dir src --reload`로 실행해서 동작 확인
-- [ ] 패키지를 추가했다면 `pyproject.toml`, `uv.lock` 함께 커밋
-- [ ] `.venv`, `__pycache__`, `.env`가 커밋에 없는지 확인
-- [ ] 디버깅용 `print()`, 불필요한 주석 삭제
+- [ ] Assignees에 본인을 지정했나요?
+- [ ] Reviewers에 팀원을 지정했나요?
+- [ ] 서버를 실행해 변경 사항을 확인했나요?
+- [ ] 패키지 추가 시 `pyproject.toml`과 `uv.lock`을 함께 커밋했나요?
+- [ ] `.venv`, `__pycache__`, `.env`가 커밋에서 제외됐나요?
+- [ ] 디버깅용 `print()`와 불필요한 주석을 제거했나요?
 
-### 5. 리뷰와 머지
+서버 실행 명령어:
 
-1. 리뷰어가 코멘트를 남기면 같은 브랜치에서 수정하고 다시 push. PR에 자동으로 반영됨.
-2. 승인(Approve)을 받으면 **Merge pull request**로 `dev`에 합치기
-3. 머지 후 `close #번호`로 연결한 이슈가 자동으로 닫혔는지 확인
-4. 다 쓴 브랜치 정리
+```bash
+uv run uvicorn main:app --app-dir src --reload
+```
+
+### 5. REVIEW & MERGE — 합주 마무리하기
+
+1. 리뷰 코멘트가 등록되면 같은 브랜치에서 수정하고 다시 Push합니다.
+2. 변경 내용은 기존 PR에 자동으로 반영됩니다.
+3. 승인을 받으면 **Merge pull request**로 `dev`에 합칩니다.
+4. 연결한 이슈가 자동으로 닫혔는지 확인합니다.
+5. 연주가 끝난 로컬 브랜치를 정리합니다.
 
 ```bash
 git switch dev
 git pull origin dev
-git branch -d feat/12-email-login # 로컬 브랜치 삭제
+git branch -d feat/12-email-login
 ```
 
 <br>
 
 ## 🐍 Python · uv 규칙
 
-| 상황                              | 할 일                                                                            |
-| --------------------------------- | -------------------------------------------------------------------------------- |
-| 처음 clone 했을 때 / pull 받은 후 | `uv sync`로 패키지 설치                                                          |
-| 패키지를 새로 추가할 때           | `uv add 패키지명` → `pyproject.toml`, `uv.lock` 둘 다 커밋 (`chore` 이슈로 등록) |
-| 서버 실행                         | 프로젝트 루트에서 `uv run uvicorn main:app --app-dir src --reload`               |
-| 커밋하면 안 되는 것               | `.venv/`, `__pycache__/`, `.env` (`.gitignore`에 등록)                           |
-| 새 폴더를 만들 때                 | 빈 `__init__.py` 함께 만들기 (`ModuleNotFoundError` 방지)                        |
+같은 무대에서 다른 소리가 나지 않도록 Python 환경과 패키지는 `uv`로 통일합니다.
 
-> ⚠️ `pip install`로 설치 금지. `uv.lock`에 기록되지 않아서 다른 팀원 환경에는 패키지가 없음.
+| 상황                       | 할 일                                                                            |
+| -------------------------- | -------------------------------------------------------------------------------- |
+| 처음 Clone하거나 Pull한 후 | `uv sync`로 패키지를 설치합니다.                                                 |
+| 패키지를 새로 추가할 때    | `uv add 패키지명`을 사용하고 `pyproject.toml`, `uv.lock`을 함께 커밋합니다.      |
+| 서버를 실행할 때           | 프로젝트 루트에서 `uv run uvicorn main:app --app-dir src --reload`를 실행합니다. |
+| 커밋하면 안 되는 파일      | `.venv/`, `__pycache__/`, `.env`                                                 |
+| 새 폴더를 만들 때          | 빈 `__init__.py`를 함께 만들어 `ModuleNotFoundError`를 방지합니다.               |
+
+> ⚠️ `pip install`은 사용하지 않습니다.  
+> `uv.lock`에 기록되지 않은 패키지는 다른 팀원의 환경에 설치되지 않습니다.
 
 <br>
 
 ## 🧹 ruff 사용법
 
-ruff는 코드 검사(lint)와 코드 정리(format)를 해주는 도구. 커밋 전에 **내가 작업한 파일·폴더만** 지정해서 실행할 것.
+`ruff`는 공연 전 악기를 튜닝하듯 코드를 검사하고 정리하는 도구입니다.
+
+커밋 전에는 반드시 **내가 작업한 파일이나 폴더만** 지정해 실행합니다.
 
 ### 명령어별 역할
 
-| 명령어                    | 역할                                                                         | 파일 수정 여부 |
-| ------------------------- | ---------------------------------------------------------------------------- | -------------- |
-| `ruff check`              | 안 쓰는 import·변수, 정의 안 된 이름 같은 실수를 찾아서 알려줌               | ❌ 보여주기만 함 |
-| `ruff check --fix`        | 찾은 문제 중 자동으로 고칠 수 있는 것(안 쓰는 import 삭제 등)을 고침          | ✅ 수정함       |
-| `ruff format`             | 들여쓰기, 띄어쓰기, 따옴표, 줄바꿈 등 코드 모양을 통일                       | ✅ 수정함       |
-| `ruff format --diff`      | format이 무엇을 바꿀지 미리 보여줌                                           | ❌ 보여주기만 함 |
+| 명령어               | 역할                                                            | 파일 수정 여부 |
+| -------------------- | --------------------------------------------------------------- | -------------- |
+| `ruff check`         | 사용하지 않는 import, 변수, 정의되지 않은 이름 등을 검사합니다. | ❌             |
+| `ruff check --fix`   | 자동으로 수정할 수 있는 문제를 정리합니다.                      | ✅             |
+| `ruff format`        | 들여쓰기, 띄어쓰기, 따옴표와 줄바꿈을 통일합니다.               | ✅             |
+| `ruff format --diff` | Format 적용 전에 변경될 내용을 보여줍니다.                      | ❌             |
 
-### 파일 지정
-
-```bash
-uv run ruff check src/users/presentation/router.py         # 검사
-uv run ruff check --fix src/users/presentation/router.py   # 자동 수정
-uv run ruff format src/users/presentation/router.py        # 코드 정리
-```
-
-### 폴더 지정
-
-폴더를 지정하면 그 안의 `.py` 파일 전부에 적용됨.
+### 파일 단위로 튜닝하기
 
 ```bash
-uv run ruff check src/users/          # users 폴더 전체 검사
-uv run ruff check --fix src/users/    # users 폴더 전체 자동 수정
-uv run ruff format src/users/         # users 폴더 전체 코드 정리
+uv run ruff check src/users/presentation/router.py
+uv run ruff check --fix src/users/presentation/router.py
+uv run ruff format src/users/presentation/router.py
 ```
 
-> 💡 여러 개를 한 번에 지정할 수도 있음: `uv run ruff check src/users/ src/shared/core/database.py`
+### 폴더 단위로 튜닝하기
+
+```bash
+uv run ruff check src/users/
+uv run ruff check --fix src/users/
+uv run ruff format src/users/
+```
+
+여러 경로도 한 번에 지정할 수 있습니다.
+
+```bash
+uv run ruff check src/users/ src/shared/core/database.py
+```
+
+> 💡 추천 순서: `check --fix` → `format` → 변경 결과 확인 → Commit
 >
-> 💡 추천 순서: `check --fix` → `format` → 결과 확인 후 커밋
->
-> ⚠️ `--fix`와 `format`은 파일을 직접 바꿈. 다른 팀원 파일까지 바뀌지 않도록 **내가 작업한 파일·폴더만 지정**할 것.
+> ⚠️ `--fix`와 `format`은 파일을 직접 수정합니다.  
+> 다른 팀원의 파트까지 바뀌지 않도록 작업 범위를 정확히 지정해 주세요.
 
 <br>
 
 ## 🐳 Docker 명령어
 
-DB는 `docker-compose.yaml`로 각자 PC에 똑같이 띄움. 접속 정보는 `.env.example`에 있음.
+PostgreSQL은 `docker-compose.yaml`을 통해 모든 팀원의 PC에서 같은 구성으로 실행합니다.  
+접속 정보는 `.env.example`에서 확인할 수 있습니다.
 
-| 상황                       | 명령어                                             | 설명                                                    |
-| -------------------------- | -------------------------------------------------- | ------------------------------------------------------- |
-| DB 켜기                    | `docker compose up -d`                             | 컨테이너가 없으면 만들고, 있으면 다시 켬                  |
-| 상태 확인                  | `docker compose ps`                                | STATUS가 `Up`이면 정상                                  |
-| 로그 보기                  | `docker compose logs -f db`                        | DB가 안 뜰 때 원인 확인 (`Ctrl + C`로 종료)             |
-| 잠깐 끄기                  | `docker compose stop`                              | 컨테이너만 멈춤. `docker compose start`로 다시 켬     |
-| 컨테이너 삭제              | `docker compose down`                              | 컨테이너는 지우지만 **데이터는 남음**                   |
-| DB 초기화                  | `docker compose down -v`                           | 컨테이너와 **데이터까지 전부 삭제**                     |
-| DB 직접 접속               | `docker compose exec db psql -U admin -d karakpe`  | SQL로 테이블 확인 (`\dt` 테이블 목록, `\q` 종료)        |
+| 상황            | 명령어                                            | 설명                                                |
+| --------------- | ------------------------------------------------- | --------------------------------------------------- |
+| DB 무대 열기    | `docker compose up -d`                            | 컨테이너가 없으면 생성하고, 있으면 다시 실행합니다. |
+| 상태 확인       | `docker compose ps`                               | `STATUS`가 `Up`이면 정상입니다.                     |
+| 로그 확인       | `docker compose logs -f db`                       | DB가 실행되지 않을 때 원인을 확인합니다.            |
+| 잠시 멈추기     | `docker compose stop`                             | 컨테이너만 정지합니다.                              |
+| 다시 시작하기   | `docker compose start`                            | 정지한 컨테이너를 다시 실행합니다.                  |
+| 컨테이너 내리기 | `docker compose down`                             | 컨테이너는 삭제하지만 데이터는 유지합니다.          |
+| DB 초기화       | `docker compose down -v`                          | 컨테이너와 데이터를 모두 삭제합니다.                |
+| DB 직접 접속    | `docker compose exec db psql -U admin -d karakpe` | PostgreSQL 콘솔에 접속합니다.                       |
 
-> 💡 데이터는 `pgdata` 볼륨에 저장돼서 컨테이너를 껐다 켜거나 `down` 해도 그대로 남음.
+> 💡 데이터는 `pgdata` 볼륨에 저장됩니다.  
+> 컨테이너를 중지하거나 `down`해도 데이터는 유지됩니다.
 >
-> ⚠️ `down -v`는 DB 데이터가 전부 지워짐. `docker-compose.yaml`의 유저·비밀번호·DB 이름을 바꿨을 때처럼 DB를 처음부터 다시 만들어야 할 때만 사용
+> ⚠️ `docker compose down -v`는 DB 데이터를 모두 삭제합니다.  
+> DB를 처음부터 다시 만들어야 할 때만 사용해 주세요.
 >
-> 💡 테이블은 Docker가 아니라 서버 코드(SQLAlchemy)가 만듦. 컨테이너가 처음 뜨면 빈 `karakpe` DB만 있음.
+> 💡 테이블은 Docker가 아니라 SQLAlchemy 기반 서버 코드가 생성합니다.  
+> 컨테이너를 처음 실행하면 빈 `karakpe` 데이터베이스만 존재합니다.
 
 <br>
 
-## 🩺 DB 연결 문제 해결
+## 🩺 DB 연결 트러블슈팅
 
-### `Connection to localhost:5432 refused` 에러가 날 때
+공연 준비 중 앰프가 연결되지 않듯, 서버와 PostgreSQL의 연결이 끊어질 수 있습니다.  
+아래 순서로 하나씩 점검합니다.
 
-서버 실행이나 DB 접속 시 아래 에러가 나는 경우임.
+### `Connection to localhost:5432 refused`
 
-```
+```text
 Connection to localhost:5432 refused. Check that the hostname and port are correct
 and that the postmaster is accepting TCP/IP connections.
 ```
 
-**1. 컨테이너 상태와 PORTS 확인**
+#### 1. 컨테이너 상태와 포트 확인
 
 ```bash
 docker compose ps
 ```
 
-| 보이는 상태                                     | 원인                                        | 해결                                          |
-| ----------------------------------------------- | ------------------------------------------- | --------------------------------------------- |
-| 목록이 비어 있음 / `Cannot connect to the Docker daemon` | 컨테이너가 꺼져 있거나 Docker Desktop이 꺼져 있음 | Docker Desktop 실행 → `docker compose up -d` |
-| STATUS `Up`인데 PORTS가 `5432/tcp`만 보임        | PC ↔ 컨테이너 포트 연결이 빠짐 (Docker Desktop 재시작 후 종종 발생) | 아래 2번 실행                               |
-| STATUS `Up`, PORTS `0.0.0.0:5432->5432/tcp`     | 정상                                        | `.env`의 `DATABASE_URL` 주소·포트 확인         |
+| 보이는 상태                                              | 원인                                          | 해결                                          |
+| -------------------------------------------------------- | --------------------------------------------- | --------------------------------------------- |
+| 목록이 비어 있음 / `Cannot connect to the Docker daemon` | 컨테이너 또는 Docker Desktop이 꺼져 있습니다. | Docker Desktop 실행 후 `docker compose up -d` |
+| `STATUS Up`, `PORTS 5432/tcp`                            | PC와 컨테이너 사이의 포트 연결이 빠졌습니다.  | 아래의 컨테이너 재생성 명령 실행              |
+| `STATUS Up`, `PORTS 0.0.0.0:5432->5432/tcp`              | 정상 상태입니다.                              | `.env`의 `DATABASE_URL` 확인                  |
 
-**2. 컨테이너 다시 만들기** (데이터는 볼륨에 남음)
+#### 2. 컨테이너 다시 만들기
 
 ```bash
 docker compose down
 docker compose up -d
-docker compose ps   # PORTS에 0.0.0.0:5432->5432/tcp 가 보이면 해결
+docker compose ps
 ```
 
-> ⚠️ 여기서 `down -v`를 쓰면 DB 데이터가 전부 지워짐. `-v` 없이 실행할 것.
+`PORTS`에 `0.0.0.0:5432->5432/tcp`가 표시되면 연결 준비가 완료된 것입니다.
 
-### `port is already allocated` 에러가 날 때
+> ⚠️ 이 과정에서는 `down -v`를 사용하지 않습니다.  
+> `-v`를 붙이면 DB 데이터까지 삭제됩니다.
 
-`docker compose up -d` 할 때 이 에러가 나면, 다른 PostgreSQL(이전 수업용 컨테이너, 로컬 설치 PostgreSQL 등)이 이미 5432 포트를 쓰고 있는 것임.
+### `port is already allocated`
+
+다른 PostgreSQL 컨테이너나 로컬 PostgreSQL이 이미 `5432` 포트를 사용하고 있다는 의미입니다.
 
 ```bash
-docker ps   # 5432를 쓰는 다른 컨테이너 찾기
-docker stop <컨테이너 이름>   # 그 컨테이너 끄기
+docker ps
+docker stop <컨테이너 이름>
 docker compose up -d
 ```
 
-> 💡 다른 PostgreSQL도 같이 켜 둬야 한다면 `docker-compose.yaml`의 포트를 `"5433:5432"`로 바꾸고, `.env`의 `DATABASE_URL`도 `localhost:5433`으로 바꿈. 이 변경은 본인 PC에만 하고 커밋하지 말 것.
+다른 PostgreSQL도 함께 실행해야 한다면 로컬 설정의 포트를 변경합니다.
 
+```yaml
+ports:
+  - "5433:5432"
+```
+
+`.env`의 `DATABASE_URL`도 `localhost:5433`으로 변경합니다.
+
+> ⚠️ 개인 PC의 포트 변경 사항은 저장소에 커밋하지 않습니다.
+
+---
+
+## 🔥 READY TO ROCK?
+
+코드를 올리기 전에 테스트하고,  
+리뷰를 요청하기 전에 변경 범위를 확인하고,  
+머지하기 전에 팀원과 합을 맞춥니다.
+
+**Five developers. One backend. One festival.**
+
+### KANT ROCK FESTIVAL — KAROCKFE
+
+![alt text](mainposter.png)
