@@ -23,8 +23,8 @@ const TABS = [
   ["tickets", "내 티켓"],
   ["payments", "결제 내역"],
   ["profile", "내 정보"],
-  ["admin", "관리자 예매"],
-  ["manage", "관리자 운영"],
+  ["admin", "관리자 예매", true],
+  ["manage", "관리자 운영", true],
 ];
 
 // 결제창에서 돌아온 직후인지 (페이지가 새로 열린 첫 순간에 한 번만 읽는다)
@@ -147,7 +147,7 @@ export default function App() {
 
         {me && (
           <nav className="tabs">
-            {TABS.map(([k, label]) => (
+            {TABS.filter(([, , adminOnly]) => !adminOnly || isAdmin).map(([k, label]) => (
               <button key={k} className={tab === k ? "on" : ""} onClick={() => { setTab(k); if (k === "festivals") setFestivalId(null); refresh(); }}>
                 {label}
               </button>
@@ -166,9 +166,9 @@ export default function App() {
           {me && tab === "mine" && <MyReservationsPage {...props} me={me} onChanged={refresh} />}
           {me && tab === "tickets" && <MyTicketsPage {...props} isAdmin={isAdmin} />}
           {me && tab === "payments" && <PaymentsPage {...props} />}
-          {me && tab === "manage" && <AdminManagePage {...props} isAdmin={isAdmin} />}
+          {me && isAdmin && tab === "manage" && <AdminManagePage {...props} isAdmin={isAdmin} />}
           {me && tab === "profile" && <ProfilePage notify={notify} onUpdated={(u) => { setWho(u.name); setMe(u); }} onWithdrawn={clearSession} />}
-          {me && tab === "admin" && <AdminPage {...props} festivalId={festivalId || 1} isAdmin={isAdmin} />}
+          {me && isAdmin && tab === "admin" && <AdminPage {...props} festivalId={festivalId || 1} isAdmin={isAdmin} />}
         </div>
 
         {/* 떠 있는 팝업 : 내용을 밀지 않음 */}
