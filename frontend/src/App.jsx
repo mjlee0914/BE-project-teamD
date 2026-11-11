@@ -126,10 +126,10 @@ export default function App() {
       <main className="left">
         <header className="topbar">
           <div className="brand">
-            <span className="logo">D</span>
+            <span className="logo">K</span>
             <div>
-              <div className="brand-name">TeamD 페스티벌 예매</div>
-              <div className="brand-sub">FastAPI 백엔드 실시간 데모</div>
+              <div className="brand-name">Kant Rock <span className="hot">Festival</span></div>
+              <div className="brand-sub">KAROCKFE · FastAPI 백엔드 실시간 데모</div>
             </div>
           </div>
           <div className="user-switch">
