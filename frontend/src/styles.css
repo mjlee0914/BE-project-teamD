@@ -77,31 +77,32 @@ h1, h2, h3 { margin: 0; }
 .user-switch > button.on { background: var(--pink); color: var(--ink); font-weight: 700; }
 .admin-dot { font-size: 10px; background: var(--pink); color: var(--ink); padding: 1px 6px; border-radius: 2px; font-family: var(--mono); font-weight: 600; }
 .tabs { display: flex; gap: 6px; padding: 10px 28px; background: var(--ink); border-bottom: 2px dashed #f2ead840; align-items: center; flex-wrap: wrap; }
-.tabs button { border: 0; background: none; padding: 7px 12px; color: var(--paper); font-family: var(--display); font-size: 14px; border-radius: var(--cut); }
+.tabs button { border: 0; background: none; padding: 7px 12px; color: var(--paper); font-weight: 700; font-size: 15px; border-radius: var(--cut); }
 .tabs button:hover { color: var(--pink); }
 .tabs button.on { background: var(--pink); color: var(--ink); transform: rotate(-2deg); box-shadow: 3px 3px 0 var(--paper); }
-.tabs .as { margin-left: auto; font-size: 11px; color: #b3aa98; font-family: var(--mono); }
+.tabs .as { margin-left: auto; font-size: 12px; color: #d2c9b6; }
 .tabs .as b { color: var(--pink); }
 
 /* ───────── common */
 .page { display: flex; flex-direction: column; gap: 20px; max-width: 760px; }
 .page-head { display: flex; align-items: center; gap: 10px; }
-.page-head h1, .page-head h2 { text-shadow: 3px 3px 0 var(--pink); }
+.page-head h1 { font-size: 30px; padding-bottom: 2px; box-shadow: inset 0 -10px 0 var(--pink); }
+.page-head h2 { font-size: 20px; }
 .card { background: var(--surface); border: 3px solid var(--ink); border-radius: var(--cut); padding: 18px; box-shadow: 6px 6px 0 var(--pink); }
 .card .card { box-shadow: none; border-width: 2px; padding: 10px 12px; background: #f8f2e3; }
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
-.eyebrow { font-size: 11px; letter-spacing: .1em; color: var(--accent); font-weight: 600; font-family: var(--mono); text-transform: uppercase; }
-.pill { font-size: 11px; padding: 2px 8px; border-radius: 2px; border: 2px solid var(--ink); background: var(--paper-dim); color: var(--ink); font-weight: 600; font-family: var(--mono); letter-spacing: .04em; white-space: nowrap; }
-.pill.PENDING { background: var(--paper); color: var(--warn); border-style: dashed; border-color: var(--warn); }
-.pill.CONFIRMED, .pill.OPEN, .pill.ISSUED { background: var(--pink); color: var(--ink); }
+.eyebrow { font-size: 12px; letter-spacing: .1em; color: var(--accent); font-weight: 600; font-family: var(--mono); text-transform: uppercase; }
+.pill { font-size: 12px; padding: 2px 8px; border-radius: 2px; border: 2px solid var(--ink); background: var(--paper-dim); color: var(--ink); font-weight: 600; font-family: var(--mono); letter-spacing: .04em; white-space: nowrap; }
+.pill.PENDING, .pill.WAITING_FOR_DEPOSIT { background: var(--red); color: #fff; }
+.pill.CONFIRMED, .pill.OPEN, .pill.ISSUED, .pill.DONE { background: var(--pink); color: var(--ink); }
 .pill.CANCELED, .pill.EXPIRED, .pill.SOLD_OUT { background: var(--ink); color: var(--paper); }
 .tag { margin-left: 6px; font-size: 11px; background: var(--blue); color: var(--paper); padding: 1px 6px; border-radius: 2px; }
-button.primary { background: var(--pink); color: var(--ink); border: 3px solid var(--ink); border-radius: var(--cut); padding: 8px 14px; font-family: var(--display); letter-spacing: .03em; box-shadow: 3px 3px 0 var(--shadow, var(--ink)); transition: transform .08s, box-shadow .08s; }
+button.primary { background: var(--pink); color: var(--ink); border: 3px solid var(--ink); border-radius: var(--cut); padding: 8px 14px; font-weight: 700; box-shadow: 3px 3px 0 var(--shadow, var(--ink)); transition: transform .08s, box-shadow .08s; }
 button.primary:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--shadow, var(--ink)); }
 button.primary:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: none; }
 button.primary:disabled { opacity: .5; cursor: default; }
-button.primary.big { width: 100%; padding: 14px; font-size: 18px; margin-top: 10px; }
+button.primary.big { width: 100%; padding: 14px; font-size: 18px; margin-top: 10px; font-family: var(--display); font-weight: 400; letter-spacing: .03em; }
 button.danger { background: var(--paper); color: var(--bad); border: 2px solid var(--bad); border-radius: var(--cut); padding: 8px 14px; font-weight: 700; }
 button.danger:hover { background: var(--bad); color: var(--paper); }
 button.ghost { background: transparent; border: 2px solid currentColor; border-radius: var(--cut); padding: 7px 12px; color: inherit; font-weight: 600; }
@@ -111,7 +112,7 @@ button.ghost.lock { border-style: dashed; }
 
 /* ───────── reserve */
 .hero { position: relative; padding: 4px 0 8px; }
-.hero h1 { font-size: 40px; margin: 8px 0 6px; text-transform: uppercase; text-shadow: 4px 4px 0 var(--pink); }
+.hero h1 { display: inline-block; font-size: 40px; margin: 8px 0 6px; text-transform: uppercase; box-shadow: inset 0 -14px 0 var(--pink); }
 .hero p { margin: 0; }
 .perf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .perf-card { background: var(--surface); border: 3px solid var(--ink); border-radius: var(--cut); padding: 16px; display: flex; flex-direction: column; gap: 8px; box-shadow: 6px 6px 0 var(--pink); }
@@ -125,7 +126,7 @@ button.ghost.lock { border-style: dashed; }
 .remain-text b { font-size: 20px; font-family: var(--display); font-weight: 400; }
 .perf-price { font-family: var(--display); font-size: 17px; }
 .form h2 { font-size: 20px; margin-bottom: 12px; }
-.field-label { display: block; font-size: 11px; color: var(--muted); margin: 12px 0 6px; font-weight: 600; font-family: var(--mono); letter-spacing: .06em; }
+.field-label { display: block; font-size: 13px; color: #3a352c; margin: 14px 0 6px; font-weight: 700; }
 .seg { display: flex; gap: 6px; flex-wrap: wrap; }
 .seg button { flex: 1; border: 2px solid var(--ink); background: #f8f2e3; color: var(--ink); padding: 10px; border-radius: var(--cut); font-weight: 600; }
 .seg.small button { flex: none; padding: 6px 12px; font-size: 13px; }
@@ -137,14 +138,14 @@ button.ghost.lock { border-style: dashed; }
 .price-box > div { display: flex; justify-content: space-between; }
 .price-box .off { color: var(--bad); font-weight: 700; }
 .price-box .final { font-family: var(--display); font-size: 22px; margin-top: 6px; }
-.hint { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+.hint { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
 
 /* ───────── my reservations */
 .res-list { display: flex; flex-direction: column; gap: 16px; }
 .res-card { background: var(--surface); border: 3px solid var(--ink); border-radius: var(--cut); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; border-left: 12px solid var(--ink); box-shadow: 5px 5px 0 var(--paper-dim); }
 .res-card.PENDING { border-left-color: var(--red); box-shadow: 5px 5px 0 var(--red); }
 .res-card.CONFIRMED { border-left-color: var(--pink); box-shadow: 5px 5px 0 var(--pink); }
-.res-card.CANCELED, .res-card.EXPIRED { opacity: .6; box-shadow: none; }
+.res-card.CANCELED, .res-card.EXPIRED { background: #cfc7b5; box-shadow: none; }
 .res-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .res-id { color: var(--muted); margin-right: 8px; font-family: var(--mono); font-size: 13px; }
 .res-mid { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
@@ -160,9 +161,9 @@ button.ghost.lock { border-style: dashed; }
 .ticket-l { flex: 1; padding: 14px 16px; border-right: 3px dashed var(--ink); }
 .ticket-l h3 { margin: 6px 0 2px; font-size: 17px; }
 .ticket-l p { margin: 0; font-size: 13px; }
-.ticket-r { width: 104px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 12px; background: var(--pink); font-family: var(--mono); font-weight: 600; }
-.ticket.CANCELED { opacity: .55; box-shadow: none; }
-.ticket.CANCELED .ticket-r { background: var(--paper-dim); }
+.ticket-r { width: 112px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 700; }
+.ticket-r .muted { color: var(--ink); }
+.ticket.CANCELED, .ticket.EXPIRED { background: #cfc7b5; box-shadow: none; }
 
 /* ───────── admin */
 .filters { display: flex; gap: 20px; flex-wrap: wrap; }
@@ -170,7 +171,7 @@ button.ghost.lock { border-style: dashed; }
 .error-card { color: var(--bad); border-color: var(--bad); background: #ffe3dd; box-shadow: 6px 6px 0 var(--red); }
 table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
 th, td { text-align: left; padding: 8px; border-bottom: 1px dashed #0d0d0d66; }
-th { font-size: 11px; color: var(--muted); font-weight: 600; font-family: var(--mono); letter-spacing: .06em; border-bottom: 2px solid var(--ink); }
+th { font-size: 13px; color: #3a352c; font-weight: 700; border-bottom: 2px solid var(--ink); }
 
 /* ═════════ trace panel (오른쪽) */
 .trace { background: var(--code-bg); color: var(--code-text); display: flex; flex-direction: column; min-width: 0; border-left: 1px solid #000; }
@@ -316,12 +317,12 @@ button.back { align-self: flex-start; }
 .fest-card h3 { margin: 6px 0 4px; font-size: 22px; text-transform: uppercase; }
 .fest-card p { margin: 0; font-size: 13px; }
 .fest-side { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 10px; flex: none; }
-.fest-side .go { background: var(--ink); color: var(--pink); font-family: var(--display); font-size: 13px; padding: 3px 10px; border-radius: var(--cut); transform: rotate(-2deg); }
+.fest-side .go { background: var(--ink); color: var(--pink); font-weight: 700; font-size: 14px; padding: 4px 12px; border-radius: var(--cut); transform: rotate(-2deg); }
 .pill.UPCOMING, .pill.ONGOING, .pill.SCHEDULED { background: var(--pink); color: var(--ink); }
 .pill.ENDED, .pill.COMPLETED { background: var(--paper-dim); color: var(--muted); }
 .info { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
 .info > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.info span { font-size: 11px; color: var(--muted); font-family: var(--mono); letter-spacing: .06em; }
+.info span { font-size: 13px; color: var(--muted); font-weight: 500; }
 .info b { overflow-wrap: anywhere; }
 .pay-box { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: var(--cut); background: var(--paper-dim); border: 2px dashed var(--ink); }
 .pay-box.issued { background: var(--pink-soft); border-style: solid; }
@@ -343,3 +344,18 @@ button.ghost:disabled { opacity: .45; cursor: default; }
 @media (max-width: 1100px) {
   .trace { border-left: 0; border-top: 4px solid var(--pink); }
 }
+
+/* 가독성 보정 : 카드 안 요소 사이 간격, 비활성 버튼 */
+.card > .res-actions, .card > .info + * { margin-top: 16px; }
+.form > button.primary:not(.big), .form > button.danger { margin-top: 14px; }
+.form > input + input { margin-top: 8px; }
+.seg button:disabled { opacity: .4; cursor: default; }
+.seg > .muted { align-self: center; padding: 0 6px; }
+.pill.USED { background: var(--blue); color: #fff; }
+.ticket-l h3, .fest-card h3 { letter-spacing: 0; }
+
+/* 상세 패널 : 목록 위에 열리고, 어떤 항목을 보고 있는지 표시 */
+.detail-panel { scroll-margin-top: 12px; box-shadow: 6px 6px 0 var(--blue); }
+.ticket.selected { outline: 3px solid var(--blue); outline-offset: 3px; }
+tr.selected td { background: var(--pink-soft); }
+.pager { margin-top: 12px; justify-content: center; }

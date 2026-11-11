@@ -1,6 +1,6 @@
 // 티켓 : 목록(상태 필터·페이지) + 상세 + 단일 취소
 // - 일반 회원 : 내 티켓 / 관리자 : 전체 티켓 검색 (회차 id로 필터 가능)
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api/endpoints";
 
 const STATUSES = ["PENDING", "ISSUED", "USED", "CANCELED", "EXPIRED"];
@@ -13,6 +13,11 @@ export default function MyTicketsPage({ version, notify, isAdmin }) {
   const [perfId, setPerfId] = useState("");
   const [data, setData] = useState(null);
   const [detail, setDetail] = useState(null);
+  const detailRef = useRef(null);
+  // 상세를 열면 목록 위의 상세 카드가 보이도록 올려준다
+  useEffect(() => {
+    if (detail) detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [detail?.ticket_id]);
 
   async function load() {
     try {
@@ -72,33 +77,8 @@ export default function MyTicketsPage({ version, notify, isAdmin }) {
         )}
       </div>
 
-      {data && items.length === 0 && <div className="card muted">조건에 맞는 티켓이 없어요.</div>}
-      <div className="ticket-grid">
-        {items.map((t) => (
-          <article key={t.ticket_id} className={`ticket ${t.status}`} onClick={() => open(t.ticket_id)} style={{ cursor: "pointer" }}>
-            <div className="ticket-l">
-              <div className="eyebrow">TICKET #{t.ticket_id} · 예매 #{t.reservation_id}</div>
-              <h3>{t.performance_title}</h3>
-              <p className="muted">{fmt(t.performance_start_at)}</p>
-            </div>
-            <div className="ticket-r">
-              <span className={`pill ${t.status}`}>{t.status}</span>
-              <span className="muted">{t.price.toLocaleString()}원</span>
-            </div>
-          </article>
-        ))}
-      </div>
-
-      {data && pages > 1 && (
-        <div className="seg small">
-          <button disabled={page <= 1} onClick={() => setPage(page - 1)}>← 이전</button>
-          <span className="muted">{page} / {pages}</span>
-          <button disabled={page >= pages} onClick={() => setPage(page + 1)}>다음 →</button>
-        </div>
-      )}
-
       {detail && (
-        <section className="card form">
+        <section className="card form detail-panel" ref={detailRef}>
           <div className="page-head">
             <h2>티켓 #{detail.ticket_id} 상세</h2>
             <button className="ghost small" onClick={() => setDetail(null)}>닫기</button>
@@ -122,6 +102,32 @@ export default function MyTicketsPage({ version, notify, isAdmin }) {
           )}
         </section>
       )}
+
+      {data && items.length === 0 && <div className="card muted">조건에 맞는 티켓이 없어요.</div>}
+      <div className="ticket-grid">
+        {items.map((t) => (
+          <article key={t.ticket_id} className={`ticket ${t.status} ${detail?.ticket_id === t.ticket_id ? "selected" : ""}`} onClick={() => open(t.ticket_id)} style={{ cursor: "pointer" }}>
+            <div className="ticket-l">
+              <div className="eyebrow">TICKET #{t.ticket_id} · 예매 #{t.reservation_id}</div>
+              <h3>{t.performance_title}</h3>
+              <p className="muted">{fmt(t.performance_start_at)}</p>
+            </div>
+            <div className="ticket-r">
+              <span className={`pill ${t.status}`}>{t.status}</span>
+              <span className="muted">{t.price.toLocaleString()}원</span>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      {data && pages > 1 && (
+        <div className="seg small">
+          <button disabled={page <= 1} onClick={() => setPage(page - 1)}>← 이전</button>
+          <span className="muted">{page} / {pages}</span>
+          <button disabled={page >= pages} onClick={() => setPage(page + 1)}>다음 →</button>
+        </div>
+      )}
+
     </div>
   );
 }

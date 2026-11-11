@@ -1,14 +1,20 @@
 // 결제 내역 : 목록 / 상세 / 상태 재확인(reconcile) / 결제 취소(환불)
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api/endpoints";
 
 const won = (n) => `${n.toLocaleString()}원`;
 const fmt = (s) => (s ? new Date(s).toLocaleString("ko-KR") : "-");
 const CANCELABLE = ["DONE", "WAITING_FOR_DEPOSIT"];
+const SIZE = 10; // 결제 목록 API에 페이지 파라미터가 없어 화면에서 나눈다
 
 export default function PaymentsPage({ version, notify }) {
   const [list, setList] = useState(null);
   const [detail, setDetail] = useState(null);
+  const [page, setPage] = useState(1);
+  const detailRef = useRef(null);
+  useEffect(() => {
+    if (detail) detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [detail?.payment_id]);
   const [reason, setReason] = useState("단순 변심");
   const [bank, setBank] = useState("");
   const [account, setAccount] = useState("");
@@ -51,46 +57,25 @@ export default function PaymentsPage({ version, notify }) {
 
   if (!list) return <div className="page muted">불러오는 중…</div>;
 
+  const pages = Math.max(1, Math.ceil(list.length / SIZE));
+  const cur = Math.min(page, pages); // 취소로 목록이 줄어도 빈 페이지에 머물지 않게
+  const rows = [...list].reverse().slice((cur - 1) * SIZE, cur * SIZE);
+
   return (
     <div className="page">
       <div className="page-head">
         <h1>결제 내역</h1>
         <span className="muted">{list.length}건</span>
       </div>
-      {list.length === 0 && <div className="card muted">결제 내역이 없어요.</div>}
-      {list.length > 0 && (
-        <div className="card table-card">
-          <table>
-            <thead>
-              <tr><th>#</th><th>예매</th><th>금액</th><th>수단</th><th>상태</th><th /></tr>
-            </thead>
-            <tbody>
-              {[...list].reverse().map((p) => (
-                <tr key={p.payment_id}>
-                  <td>{p.payment_id}</td>
-                  <td>#{p.reservation_id}</td>
-                  <td>{won(p.amount)}</td>
-                  <td>{p.method || "-"}</td>
-                  <td><span className="pill">{p.status}</span></td>
-                  <td>
-                    <button className="ghost small" onClick={() => api.payment(p.payment_id).then(setDetail).catch((e) => notify("bad", `${e.status} ${e.message}`))}>상세</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
       {detail && (
-        <section className="card form">
+        <section className="card form detail-panel" ref={detailRef}>
           <div className="page-head">
             <h2>결제 #{detail.payment_id} 상세</h2>
             <button className="ghost small" onClick={() => setDetail(null)}>닫기</button>
           </div>
           <div className="info">
             <div><span>주문번호</span><b>{detail.order_id}</b></div>
-            <div><span>상태</span><b>{detail.status}</b></div>
+            <div><span>상태</span><b><span className={`pill ${detail.status}`}>{detail.status}</span></b></div>
             <div><span>금액</span><b>{won(detail.amount)}</b></div>
             <div><span>수단</span><b>{detail.method || "-"}</b></div>
             <div><span>결제 시각</span><b>{fmt(detail.paid_at)}</b></div>
@@ -118,6 +103,39 @@ export default function PaymentsPage({ version, notify }) {
           )}
         </section>
       )}
+
+      {list.length === 0 && <div className="card muted">결제 내역이 없어요.</div>}
+      {list.length > 0 && (
+        <div className="card table-card">
+          <table>
+            <thead>
+              <tr><th>#</th><th>예매</th><th>금액</th><th>수단</th><th>상태</th><th /></tr>
+            </thead>
+            <tbody>
+              {rows.map((p) => (
+                <tr key={p.payment_id} className={detail?.payment_id === p.payment_id ? "selected" : ""}>
+                  <td>{p.payment_id}</td>
+                  <td>#{p.reservation_id}</td>
+                  <td>{won(p.amount)}</td>
+                  <td>{p.method || "-"}</td>
+                  <td><span className={`pill ${p.status}`}>{p.status}</span></td>
+                  <td>
+                    <button className="ghost small" onClick={() => api.payment(p.payment_id).then(setDetail).catch((e) => notify("bad", `${e.status} ${e.message}`))}>상세</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {pages > 1 && (
+            <div className="seg small pager">
+              <button disabled={cur <= 1} onClick={() => setPage(cur - 1)}>← 이전</button>
+              <span className="muted">{cur} / {pages}</span>
+              <button disabled={cur >= pages} onClick={() => setPage(cur + 1)}>다음 →</button>
+            </div>
+          )}
+        </div>
+      )}
+
     </div>
   );
 }
