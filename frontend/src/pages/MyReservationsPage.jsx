@@ -1,9 +1,19 @@
-// 내 예매 : 목록 + 입금 완료(시뮬레이션) / 만료 / 취소 / 동시 취소(락 시연)
+// 내 예매 : 목록 + 결제(토스 결제창) / 입금 완료 / 만료 / 취소 / 동시 취소(락 시연)
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/endpoints";
+import { openPaymentWindow } from "../api/toss";
 
 const TYPE_LABEL = { SAT: "토요일권", SUN: "일요일권", BOTH: "양일권" };
 const STATUS_LABEL = { PENDING: "입금 대기", CONFIRMED: "예매 확정", CANCELED: "취소됨", EXPIRED: "기한 만료" };
+const PAY_LABEL = {
+  READY: "결제 준비됨 (결제창 미완료)",
+  IN_PROGRESS: "승인 진행 중",
+  WAITING_FOR_DEPOSIT: "가상계좌 발급됨 · 입금 대기",
+  DONE: "결제 완료",
+  ABORTED: "결제 실패",
+  EXPIRED: "결제 만료",
+  CANCELED: "결제 취소",
+};
 const won = (n) => `${n.toLocaleString()}원`;
 
 function useNow() {
@@ -22,14 +32,26 @@ function left(ms) {
   return `${m}분 ${String(s).padStart(2, "0")}초 남음`;
 }
 
-export default function MyReservationsPage({ version, notify, onChanged, adminId }) {
+// 예매의 결제 시도 중 가장 최근 것
+const latest = (list) => (list && list.length ? list[list.length - 1] : null);
+
+export default function MyReservationsPage({ version, notify, onChanged, me }) {
   const [list, setList] = useState(null);
+  const [pays, setPays] = useState({}); // reservation_id → 결제 목록
+  const [paying, setPaying] = useState(null);
   const now = useNow();
   const first = useRef(true);
 
   async function load(trace = true) {
     try {
-      setList(await api.myReservations({ trace }));
+      const rows = await api.myReservations({ trace });
+      setList(rows);
+      // 입금 대기 예매의 결제 상태 (화면 표시용이라 코드 패널에는 보여주지 않음)
+      const pending = rows.filter((r) => r.status === "PENDING");
+      const entries = await Promise.all(
+        pending.map((r) => api.payments(r.reservation_id).then((p) => [r.reservation_id, p]).catch(() => [r.reservation_id, []])),
+      );
+      setPays(Object.fromEntries(entries));
     } catch (e) {
       notify("bad", e.message);
     }
@@ -49,17 +71,21 @@ export default function MyReservationsPage({ version, notify, onChanged, adminId
     onChanged();
   }
 
-  // 같은 예매에 "본인 취소"와 "관리자 취소"를 동시에 보낸다 → 하나는 성공, 하나는 잠금 대기 후 409
-  async function doubleCancel(id) {
-    const results = await Promise.allSettled([
-      api.cancelReservation(id),
-      api.cancelReservation(id, { actor: adminId }),
-    ]);
-    const ok = results.filter((r) => r.status === "fulfilled").length;
-    const fail = results.filter((r) => r.status === "rejected").map((r) => r.reason.code);
-    notify(ok === 1 ? "good" : "bad", `동시 취소 2건 → 성공 ${ok}건 / 실패 ${fail.length}건 ${fail.join(", ")}`);
-    onChanged();
+  // 결제하기 : ① 결제 건 생성(서버가 금액·주문번호 결정) → ② 토스 결제창 → ③ 돌아오면 App이 승인 API 호출
+  async function pay(r, method) {
+    setPaying(r.reservation_id);
+    try {
+      const payment = await api.createPayment(r.reservation_id);
+      await openPaymentWindow({ method, payment, reservation: r, customerName: me.name });
+    } catch (e) {
+      // 결제창을 닫은 경우(USER_CANCEL)는 실패로 알리지 않는다
+      if (e?.code !== "USER_CANCEL") notify("bad", `${e.status || ""} ${e.code || ""} · ${e.message}`);
+      onChanged();
+    } finally {
+      setPaying(null);
+    }
   }
+
 
   if (!list) return <div className="page muted">불러오는 중…</div>;
 
@@ -69,19 +95,22 @@ export default function MyReservationsPage({ version, notify, onChanged, adminId
         <h1>내 예매</h1>
         <span className="muted">{list.length}건</span>
       </div>
-      {list.length === 0 && <div className="card muted">아직 예매가 없어요. "예매하기"에서 예매해 보세요.</div>}
+      {list.length === 0 && <div className="card muted">아직 예매가 없어요. "축제"에서 예매해 보세요.</div>}
 
       <div className="res-list">
         {[...list].reverse().map((r) => {
           const active = r.status === "PENDING" || r.status === "CONFIRMED";
           const due = r.deposit_due_at ? new Date(r.deposit_due_at).getTime() - now : null;
           const exp = new Date(r.expires_at).getTime() - now;
+          const payment = latest(pays[r.reservation_id]);
+          const waiting = payment?.status === "WAITING_FOR_DEPOSIT";
+          const paid = payment?.status === "DONE";
           return (
             <article key={r.reservation_id} className={`res-card ${r.status}`}>
               <div className="res-top">
                 <div>
                   <span className="res-id">#{r.reservation_id}</span>
-                  <b>{TYPE_LABEL[r.ticket_type]}</b> × {r.quantity}장
+                  <b>{r.festival_name}</b> · {TYPE_LABEL[r.ticket_type]} × {r.quantity}장
                   {r.discount_type !== "NONE" && <span className="tag">{r.discount_type}</span>}
                 </div>
                 <span className={`pill ${r.status}`}>{STATUS_LABEL[r.status]}</span>
@@ -95,23 +124,31 @@ export default function MyReservationsPage({ version, notify, onChanged, adminId
                   </span>
                 )}
               </div>
+
+              {r.status === "PENDING" && (
+                <div className={`pay-box ${waiting || paid ? "issued" : ""}`}>
+                  <div className="pay-state">
+                    <span className="eyebrow">결제</span>
+                    <b>{payment ? PAY_LABEL[payment.status] || payment.status : "아직 결제 전"}</b>
+                    {payment?.method && <span className="muted">{payment.method}</span>}
+                  </div>
+                  {!waiting && !paid && (
+                    <div className="res-actions">
+                      <button className="primary" disabled={paying === r.reservation_id} onClick={() => pay(r, "가상계좌")}>
+                        가상계좌로 결제
+                      </button>
+                      <button className="ghost" disabled={paying === r.reservation_id} onClick={() => pay(r, "카드")}>
+                        카드로 결제
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {active && (
                 <div className="res-actions">
-                  {r.status === "PENDING" && (
-                    <>
-                      <button className="primary" onClick={() => act(() => api.confirmReservation(r.reservation_id), `#${r.reservation_id} 입금 완료 → 예매 확정 + 티켓 발급`)}>
-                        입금 완료 (시뮬레이션)
-                      </button>
-                      <button className="ghost" onClick={() => act(() => api.expireReservation(r.reservation_id), `#${r.reservation_id} 입금 기한 만료 처리`)}>
-                        입금 기한 지나게 하기
-                      </button>
-                    </>
-                  )}
                   <button className="danger" onClick={() => act(() => api.cancelReservation(r.reservation_id), `#${r.reservation_id} 취소 완료`)}>
                     취소
-                  </button>
-                  <button className="ghost lock" onClick={() => doubleCancel(r.reservation_id)} title="본인 취소와 관리자 취소를 동시에 보냅니다">
-                    🔒 동시에 2번 취소
                   </button>
                 </div>
               )}

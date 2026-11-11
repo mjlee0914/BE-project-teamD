@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/endpoints";
 
-const FESTIVAL_ID = 1;
 const TYPES = [
   { value: "SAT", label: "토요일권" },
   { value: "SUN", label: "일요일권" },
@@ -20,7 +19,7 @@ const KST = { timeZone: "Asia/Seoul" };
 const fmtDate = (s) => new Date(s).toLocaleString("ko-KR", { ...KST, month: "long", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" });
 const won = (n) => `${n.toLocaleString()}원`;
 
-export default function ReservePage({ version, notify, onReserved }) {
+export default function ReservePage({ festivalId, version, notify, onReserved, onBack }) {
   const [festival, setFestival] = useState(null);
   const [perfs, setPerfs] = useState([]);
   const [type, setType] = useState("SAT");
@@ -29,9 +28,9 @@ export default function ReservePage({ version, notify, onReserved }) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api.festival(FESTIVAL_ID).then(setFestival).catch(() => {});
-    api.performances(FESTIVAL_ID).then((d) => setPerfs(d?.items || [])).catch(() => {});
-  }, [version]);
+    api.festival(festivalId).then(setFestival).catch(() => {});
+    api.performances(festivalId).then((d) => setPerfs(d?.items || [])).catch(() => {});
+  }, [version, festivalId]);
 
   const sat = perfs.find((p) => new Date(p.starts_at).toLocaleDateString("en-US", { ...KST, weekday: "short" }) === "Sat");
   const sun = perfs.find((p) => new Date(p.starts_at).toLocaleDateString("en-US", { ...KST, weekday: "short" }) === "Sun");
@@ -48,8 +47,8 @@ export default function ReservePage({ version, notify, onReserved }) {
   async function reserve() {
     setBusy(true);
     try {
-      const r = await api.createReservation({ festival_id: FESTIVAL_ID, ticket_type: type, quantity: qty, discount_type: discount });
-      notify("good", `예매 #${r.reservation_id} 생성 · ${won(r.final_price)} · 입금 대기`);
+      const r = await api.createReservation({ festival_id: festivalId, ticket_type: type, quantity: qty, discount_type: discount });
+      notify("good", `예매 #${r.reservation_id} 생성 · ${won(r.final_price)} · 이제 결제해 주세요`);
       onReserved();
     } catch (e) {
       notify("bad", `${e.status} ${e.code || ""} · ${e.message}`);
@@ -60,6 +59,7 @@ export default function ReservePage({ version, notify, onReserved }) {
 
   return (
     <div className="page">
+      <button className="ghost small back" onClick={onBack}>← 축제 목록</button>
       {festival && (
         <section className="hero">
           <div className="eyebrow">FESTIVAL #{festival.festival_id} · {festival.status}</div>

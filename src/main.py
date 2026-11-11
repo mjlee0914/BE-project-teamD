@@ -19,6 +19,7 @@ from fastapi import FastAPI
 
 from auth.presentation.routers.v1.router import router as auth_router
 from festivals.presentation.routers.v1.router import router as festival_router
+from payments.infrastructure.recovery_job import start_payment_recovery_job
 from payments.presentation.routers.v1.router import router as payment_router
 from payments.presentation.routers.v1.webhook_router import (
     router as payment_webhook_router,
@@ -44,12 +45,14 @@ from wiring import wire_dependencies
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     expire_task = start_expire_job()
-    ticket_expire_task = start_ticket_expire_job()
+    payment_task = start_payment_recovery_job()
     yield
-    for task in (expire_task, ticket_expire_task):
-        task.cancel()
-        with suppress(asyncio.CancelledError):
-            await task
+    expire_task.cancel()
+    payment_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await expire_task
+    with suppress(asyncio.CancelledError):
+        await payment_task
 
 
 app = FastAPI(lifespan=lifespan)

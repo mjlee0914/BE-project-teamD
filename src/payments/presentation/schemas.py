@@ -5,7 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from payments.domain.entities import Payment
-from payments.domain.enums import PaymentStatus
+from payments.domain.enums import PaymentRecoveryStatus, PaymentStatus
 from payments.domain.service import RefundAccount
 
 
@@ -67,6 +67,7 @@ class PaymentResponse(BaseModel):
     canceled_at: datetime | None
     created_at: datetime
     updated_at: datetime | None
+    recovery_status: PaymentRecoveryStatus | None = None
 
     # 엔티티 필드를 명시적으로 선택해 응답을 만든다. 엔티티에 필드가 추가되어도 자동으로 외부에 노출되지 않는다.
     @classmethod
@@ -83,4 +84,5 @@ class PaymentResponse(BaseModel):
             canceled_at=payment.canceled_at,
             created_at=payment.created_at,
             updated_at=payment.updated_at,
+            recovery_status=payment.recovery_status,
         )

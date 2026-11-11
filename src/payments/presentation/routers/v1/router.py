@@ -1,9 +1,12 @@
 # 파일 역할: 결제 HTTP API다. 인증·소유권 확인 → 응용 서비스 호출 → 공개 가능한 응답 필드만 반환하는 순서다.
 
+import os
+from pathlib import Path as FilePath
 from typing import Annotated
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Path, Query
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from auth.domain.entities import TokenPayload
 from payments.application.service import PaymentService
@@ -23,6 +26,7 @@ from payments.presentation.schemas import (
     ReconciliationRequest,
 )
 from shared.core.schemas import APIResponse
+from shared.core.time import KST
 
 router = APIRouter(prefix="/v1", tags=["payments"])
 CurrentUser = Annotated[TokenPayload, Depends(provide_current_user)]
@@ -44,6 +48,48 @@ async def get_owned_payment(
 
 # 이 타입을 매개변수로 선언한 API는 공통 소유권 검사를 먼저 실행한다.
 OwnedPayment = Annotated[Payment, Depends(get_owned_payment)]
+
+
+# 토스 결제창에서 인증을 마친 뒤 같은 페이지로 돌아와 서버 승인 API를 호출한다.
+@router.get("/payments/checkout", response_class=HTMLResponse, include_in_schema=False)
+async def checkout_page():
+    content = FilePath(__file__).with_name("checkout.html").read_text(encoding="utf-8")
+    return HTMLResponse(
+        content, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"}
+    )
+
+
+@router.get("/payments/{payment_id}/checkout", summary="토스 결제창 설정 조회")
+async def checkout_config(payment: OwnedPayment, service: Service):
+    context = await service.checkout_context(payment)
+    client_key = os.getenv("TOSS_CLIENT_KEY", "")
+    if not client_key.startswith(("test_ck_", "live_ck_")):
+        raise HTTPException(
+            status_code=503,
+            detail="TOSS_CLIENT_KEY에 API 개별 연동 클라이언트 키를 설정해 주세요.",
+        )
+    return APIResponse.ok(
+        data={
+            "payment_id": payment.payment_id,
+            "client_key": client_key,
+            "customer_key": "customer_" + uuid4().hex,
+            "order_id": payment.order_id,
+            "order_name": payment.reservation.festival_name,
+            "amount": payment.amount,
+            "deposit_due_at": context.deposit_due_at,
+            "virtual_account_due_date": context.deposit_due_at.astimezone(KST).strftime(
+                "%Y-%m-%dT%H:%M:%S"
+            ),
+        }
+    )
+
+
+def _payment_response(payment: Payment):
+    data = APIResponse.ok(data=PaymentResponse.from_domain(payment))
+    return JSONResponse(
+        status_code=202 if payment.recovery_status else 200,
+        content=data.model_dump(mode="json"),
+    )
 
 
 @router.post(
@@ -106,7 +152,7 @@ async def approve_payment(
         )
     except PaymentProcessingError as exc:
         return _processing_error(exc)
-    return APIResponse.ok(data=PaymentResponse.from_domain(result))
+    return _payment_response(result)
 
 
 # 요청의 환불 계좌를 도메인 값으로 바꿔 취소를 요청하고, 결과를 공개 응답 스키마로 반환한다.
@@ -125,7 +171,7 @@ async def cancel_payment(
         )
     except PaymentProcessingError as exc:
         return _processing_error(exc)
-    return APIResponse.ok(data=PaymentResponse.from_domain(result))
+    return _payment_response(result)
 
 
 # 소유권 확인 후 결제사 최신 결과를 재조회한다. 통신 실패는 승인·취소와 같은 502 형식으로 전달한다.
@@ -139,4 +185,4 @@ async def reconcile_payment(
         result = await service.reconcile(payment.payment_id, request.payment_key)
     except PaymentProcessingError as exc:
         return _processing_error(exc)
-    return APIResponse.ok(data=PaymentResponse.from_domain(result))
+    return _payment_response(result)

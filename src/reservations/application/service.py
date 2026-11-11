@@ -348,6 +348,26 @@ class ReservationService:
         return saved
 
     # [작업 3] 입금 기한 지난 예매 만료
+    async def release_for_payment_failure(self, reservation_id: int) -> None:
+        """결제 불일치 복구용 취소. 고객 취소 마감과 별개로 미사용 티켓·재고를 정리한다."""
+        await self._reservation_repo.lock(reservation_id)
+        reservation = await self._reservation_repo.find_by_id(reservation_id)
+        if reservation is None:
+            raise ReservationNotFound()
+        if reservation.status in (
+            ReservationStatus.CANCELED,
+            ReservationStatus.EXPIRED,
+        ):
+            return
+        had_tickets = reservation.status == ReservationStatus.CONFIRMED
+        now = now_utc()
+        reservation.cancel(now)
+        if had_tickets:
+            await self._ticket_service.cancel_all_by_reservation(reservation_id, now)
+        else:
+            await self._restore_remaining(reservation)
+        await self._reservation_repo.save(reservation)
+
     # - 주기 작업(reservations/infrastructure/expire_job.py)이 몇 분마다 호출
     # - 만료한 예매 수를 돌려줌 (로그용)
     async def expire_overdue(self, now: datetime | None = None) -> int:
