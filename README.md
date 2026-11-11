@@ -1,5 +1,8 @@
 # 🎸 KAROCKFE — KANT ROCK FESTIVAL
 
+## 🔥 READY TO ROCK?
+
+**Five developers. One backend. One festival.**
 ![alt text](<ChatGPT Image Nov 11, 2026, 11_14_30 AM.png>)
 
 > **공연은 무대에서, 예매는 코드로.**  
@@ -7,6 +10,18 @@
 
 관객이 공연을 발견하고 티켓을 예매하는 순간까지.  
 회원·인증·공연·축제·티켓·예매·결제 도메인이 하나의 무대를 완성합니다.
+
+---
+
+## 🐈‍⬛ 시연
+
+### 🐾 관리자 — 축제 생성 → 회차 생성
+
+![관리자 시연](assets/demo-admin.gif)
+
+### 🐾 사용자 — 로그인 → 양일권 예매 → 결제 → 조회 → 취소 → 로그아웃
+
+![사용자 시연](assets/demo-user.gif)
 
 ---
 
@@ -334,14 +349,7 @@ ports:
 
 ---
 
-## 🔥 READY TO ROCK?
-
-코드를 올리기 전에 테스트하고,  
-리뷰를 요청하기 전에 변경 범위를 확인하고,  
-머지하기 전에 팀원과 합을 맞춥니다.
-
-**Five developers. One backend. One festival.**
-
 ### KANT ROCK FESTIVAL — KAROCKFE
 
+**Five developers. One backend. One festival.**
 ![alt text](mainposter.png)
