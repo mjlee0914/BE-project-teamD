@@ -14,13 +14,17 @@ import MyReservationsPage from "./pages/MyReservationsPage";
 import MyTicketsPage from "./pages/MyTicketsPage";
 import ProfilePage from "./pages/ProfilePage";
 import AdminPage from "./pages/AdminPage";
+import AdminManagePage from "./pages/AdminManagePage";
+import PaymentsPage from "./pages/PaymentsPage";
 
 const TABS = [
   ["festivals", "축제"],
   ["mine", "내 예매"],
   ["tickets", "내 티켓"],
+  ["payments", "결제 내역"],
   ["profile", "내 정보"],
-  ["admin", "관리자"],
+  ["admin", "관리자 예매"],
+  ["manage", "관리자 운영"],
 ];
 
 // 결제창에서 돌아온 직후인지 (페이지가 새로 열린 첫 순간에 한 번만 읽는다)
@@ -160,8 +164,10 @@ export default function App() {
             <ReservePage {...props} festivalId={festivalId} onBack={() => setFestivalId(null)} onReserved={() => { setTab("mine"); refresh(); }} />
           )}
           {me && tab === "mine" && <MyReservationsPage {...props} me={me} onChanged={refresh} />}
-          {me && tab === "tickets" && <MyTicketsPage {...props} />}
-          {me && tab === "profile" && <ProfilePage notify={notify} onUpdated={(u) => { setWho(u.name); setMe(u); }} />}
+          {me && tab === "tickets" && <MyTicketsPage {...props} isAdmin={isAdmin} />}
+          {me && tab === "payments" && <PaymentsPage {...props} />}
+          {me && tab === "manage" && <AdminManagePage {...props} isAdmin={isAdmin} />}
+          {me && tab === "profile" && <ProfilePage notify={notify} onUpdated={(u) => { setWho(u.name); setMe(u); }} onWithdrawn={clearSession} />}
           {me && tab === "admin" && <AdminPage {...props} festivalId={festivalId || 1} isAdmin={isAdmin} />}
         </div>
 

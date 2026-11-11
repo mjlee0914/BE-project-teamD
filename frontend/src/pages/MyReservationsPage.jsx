@@ -39,6 +39,7 @@ export default function MyReservationsPage({ version, notify, onChanged, me }) {
   const [list, setList] = useState(null);
   const [pays, setPays] = useState({}); // reservation_id → 결제 목록
   const [paying, setPaying] = useState(null);
+  const [detail, setDetail] = useState(null); // 예매 상세 (GET /v1/reservations/{id})
   const now = useNow();
   const first = useRef(true);
 
@@ -86,6 +87,14 @@ export default function MyReservationsPage({ version, notify, onChanged, me }) {
     }
   }
 
+
+  async function openDetail(id) {
+    try {
+      setDetail(await api.reservation(id));
+    } catch (e) {
+      notify("bad", `${e.status} ${e.code || ""} · ${e.message}`);
+    }
+  }
 
   if (!list) return <div className="page muted">불러오는 중…</div>;
 
@@ -142,6 +151,24 @@ export default function MyReservationsPage({ version, notify, onChanged, me }) {
                       </button>
                     </div>
                   )}
+                </div>
+              )}
+
+              <div className="res-actions">
+                <button className="ghost" onClick={() => openDetail(r.reservation_id)}>상세</button>
+              </div>
+
+              {detail?.reservation_id === r.reservation_id && (
+                <div className="card info">
+                  <div><span>축제 / 장소</span><b>{detail.festival_name} · {detail.venue}</b></div>
+                  <div><span>상태</span><b>{STATUS_LABEL[detail.status]}</b></div>
+                  <div><span>총 금액</span><b>{won(detail.total_price)}</b></div>
+                  <div><span>할인</span><b>{detail.discount_type} · -{won(detail.discount_amount)}</b></div>
+                  <div><span>최종 금액</span><b>{won(detail.final_price)}</b></div>
+                  <div><span>예매 시각</span><b>{new Date(detail.created_at).toLocaleString("ko-KR")}</b></div>
+                  <div><span>입금 확인</span><b>{detail.confirmed_at ? new Date(detail.confirmed_at).toLocaleString("ko-KR") : "-"}</b></div>
+                  <div><span>취소</span><b>{detail.canceled_at ? new Date(detail.canceled_at).toLocaleString("ko-KR") : "-"}</b></div>
+                  <div><button className="ghost small" onClick={() => setDetail(null)}>닫기</button></div>
                 </div>
               )}
 
