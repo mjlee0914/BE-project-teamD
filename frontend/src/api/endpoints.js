@@ -33,7 +33,6 @@ export const api = {
   // 결제창에서 받은 paymentKey로 승인 (실제 API → 토스 서버 호출)
   approvePayment: (paymentId, body) => request("POST", `/v1/payments/${paymentId}/approve`, { body }),
   payments: (reservationId) => request("GET", `/v1/payments?reservation_id=${reservationId}`, { trace: false }),
-  allPayments: () => request("GET", "/v1/payments"),
   payment: (id) => request("GET", `/v1/payments/${id}`),
   cancelPayment: (id, body) => request("POST", `/v1/payments/${id}/cancel`, { body }),
   reconcilePayment: (id, paymentKey) =>
