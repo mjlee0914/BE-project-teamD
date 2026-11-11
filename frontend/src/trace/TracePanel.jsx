@@ -13,7 +13,7 @@ const LAYERS = [
   ["service", "서비스"],
   ["domain", "도메인"],
   ["repository", "저장소"],
-  ["demo", "데모"],
+  ["external", "외부 API"],
 ];
 const WAIT_TICKS = 3; // 잠금 대기 연출 길이
 const BASE_MS = 1600; // 1x 기준 한 단계 시간
@@ -371,7 +371,7 @@ function RequestLine({ run, label }) {
       {label && <span className="req-label">{label}</span>}
       <span className={`method ${run.method}`}>{run.method}</span>
       <span className="path">{run.path.replace(/\?.*/, "")}</span>
-      {run.userId && <span className="who">user {run.userId}</span>}
+      {run.userId && <span className="who">{run.userId}</span>}
     </div>
   );
 }

@@ -9,36 +9,56 @@
 # 1. DB
 docker compose up -d db
 
-# 2. 테이블 생성 + 데모 데이터 (회원 3명, 축제 1개, 토·일 회차)
-uv run python frontend/demo_backend/seed.py
+# 2. 테이블 생성 + 데모 데이터 (⚠ 기존 데이터를 모두 지움)
+uv run python scripts/seed_demo.py
 
-# 3. 데모 백엔드 (팀 앱 + 데모용 로그인 대체·보조 API) → :8000
-uv run uvicorn server:app --app-dir frontend/demo_backend --port 8000
+# 3. 팀 백엔드 → :8000
+uv run uvicorn main:app --app-dir src --port 8000
 
 # 4. 프론트 → http://localhost:5173
 cd frontend && npm install && npm run dev
+```
+
+백엔드가 다른 주소에 있으면 `VITE_API_TARGET=http://<주소>:8000 npm run dev` 처럼 지정한다.
+
+### EC2에서 빌드본으로 띄우기
+
+```bash
+cd frontend && npm ci && npm run build
+VITE_API_TARGET=http://localhost:8000 npm run preview   # → :4173 (/v1 은 백엔드로 프록시)
 ```
 
 ## 구조
 
 | 경로 | 역할 |
 |---|---|
-| `demo_backend/seed.py` | 테이블 생성 + 데모 데이터 초기화 |
-| `demo_backend/server.py` | 팀 앱(`src/main.py`)을 그대로 import하고 데모 기능만 덧붙임 (팀 코드 수정 없음) |
+| `../scripts/seed_demo.py` | 테이블 생성 + 데모 데이터 초기화 (계정 비밀번호는 파일 안 `DEMO_PASSWORD`) |
 | `src/api/client.js` | 모든 API 호출이 지나가는 함수 → 오른쪽 패널에 요청·응답 이벤트 전달 |
 | `src/trace/flows.js` | API별 코드 흐름 정의 (파일 + 함수 이름 + 강조할 줄 문자열) |
 | `src/trace/sourceLoader.js` | 레포의 `src/**/*.py`를 그대로 읽어 함수 위치를 찾음 |
 | `src/trace/TracePanel.jsx` | 오른쪽 패널 (재생·일시정지·단계 이동·동시 요청 2열) |
-| `src/pages/*` | 왼쪽 화면 (예매하기, 내 예매, 내 티켓, 관리자) |
+| `src/api/toss.js` | 토스 결제창 열기, 결제창에서 돌아온 값 읽기 |
+| `src/pages/*` | 왼쪽 화면 (로그인·회원가입, 축제, 예매, 내 예매·결제, 내 티켓, 내 정보, 관리자) |
 
-## 데모 전용으로 대신하는 것 (실제 연동 전까지)
+## 왼쪽 화면의 흐름 (실제 API)
 
-| 데모 | 실제 | 상태 |
+회원가입·로그인(JWT) → 축제 목록 → 예매 → 결제(토스 결제창 → 승인) → 입금 확인 → 티켓
+
+- 로그인하면 받은 토큰을 `Authorization: Bearer` 헤더로 모든 요청에 싣는다 (`src/api/client.js`).
+
+## 토스 결제창을 쓰려면
+
+토스 개발자센터의 **같은 상점** 테스트 키 두 개가 필요하다. 없으면 결제 건 생성까지만 되고 결제창은 뜨지 않는다.
+
+| 위치 | 변수 | 값 |
 |---|---|---|
-| 상단 회원 선택 → `X-Demo-User` 헤더 | JWT 로그인 | auth wiring PR #138 |
-| "입금 완료 (시뮬레이션)" → `/demo/reservations/{id}/confirm` | 결제 웹훅 DONE → `confirm_reservation` | 결제 담당 |
-| "입금 기한 지나게 하기" → `/demo/reservations/{id}/expire` | 서버 만료 작업이 1분마다 실행 | 구현됨 (#134) |
-| "↺ 초기화" → `/demo/reset` | — | 데모 전용 |
+| 레포 루트 `.env` | `TOSS_SECRET_KEY` | 테스트 시크릿 키 (`test_sk_...`) |
+| `frontend/.env.local` (`.env.example` 복사) | `VITE_TOSS_CLIENT_KEY` | 테스트 클라이언트 키 (`test_ck_...`) |
+
+## 알아둘 점
+
+- 예매 확정·티켓 발급은 토스 입금 웹훅(`/v1/payments/webhooks/deposit`)이 백엔드에 도착해야 진행된다. 웹훅이 예매 확정까지 연결되어 있는지는 백엔드 쪽에서 확인해야 한다.
+- 입금 기한 만료는 서버의 만료 작업(1분 주기)이 자동 처리한다.
 
 ## 흐름을 추가하려면
 

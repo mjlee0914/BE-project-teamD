@@ -20,7 +20,7 @@ export default function MyTicketsPage({ version, notify }) {
         <h1>내 티켓</h1>
         <span className="muted">{data.total}장</span>
       </div>
-      {items.length === 0 && <div className="card muted">발급된 티켓이 없어요. 예매를 "입금 완료" 처리하면 티켓이 발급돼요.</div>}
+      {items.length === 0 && <div className="card muted">발급된 티켓이 없어요. 예매를 결제(입금 완료)하면 티켓이 발급돼요.</div>}
       <div className="ticket-grid">
         {items.map((t) => (
           <article key={t.ticket_id} className={`ticket ${t.status}`}>

@@ -1,16 +1,11 @@
 // 백엔드 파이썬 소스를 빌드 시점에 그대로 읽어 온다 (항상 실제 코드가 보이게)
 // 키 : 레포 루트 기준 경로 ("src/reservations/application/service.py")
 
-const rawModules = {
-  ...import.meta.glob("../../../src/**/*.py", { query: "?raw", import: "default" }),
-  ...import.meta.glob("../../demo_backend/*.py", { query: "?raw", import: "default" }),
-};
+const rawModules = import.meta.glob("../../../src/**/*.py", { query: "?raw", import: "default" });
 
 const loaders = {};
 for (const [p, loader] of Object.entries(rawModules)) {
-  const key = p.startsWith("../../../src/")
-    ? p.replace("../../../", "")
-    : p.replace("../../", "frontend/");
+  const key = p.replace("../../../", "");
   loaders[key] = loader;
 }
 

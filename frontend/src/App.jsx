@@ -1,43 +1,41 @@
 // 좌우 분할 : 왼쪽 서비스 화면 / 오른쪽 백엔드 코드 흐름
-import { useEffect, useState } from "react";
+// 왼쪽은 실제 서비스 흐름을 그대로 따른다
+//   회원가입·로그인(JWT) → 축제 목록 → 예매 → 결제(토스 결제창 → 승인) → 입금 확인 → 티켓
+import { useEffect, useRef, useState } from "react";
 import { api } from "./api/endpoints";
-import { setCurrentUser } from "./api/client";
+import { getToken, setSession, setUnauthorizedHandler, setWho } from "./api/client";
+import { readPaymentReturn } from "./api/toss";
 import { traceBus } from "./trace/traceBus";
 import TracePanel from "./trace/TracePanel";
+import AuthPage from "./pages/AuthPage";
+import FestivalsPage from "./pages/FestivalsPage";
 import ReservePage from "./pages/ReservePage";
 import MyReservationsPage from "./pages/MyReservationsPage";
 import MyTicketsPage from "./pages/MyTicketsPage";
+import ProfilePage from "./pages/ProfilePage";
 import AdminPage from "./pages/AdminPage";
 
 const TABS = [
-  ["reserve", "예매하기"],
+  ["festivals", "축제"],
   ["mine", "내 예매"],
   ["tickets", "내 티켓"],
+  ["profile", "내 정보"],
   ["admin", "관리자"],
 ];
 
+// 결제창에서 돌아온 직후인지 (페이지가 새로 열린 첫 순간에 한 번만 읽는다)
+const paymentReturn = readPaymentReturn();
+
 export default function App() {
-  const [users, setUsers] = useState([]);
-  const [userId, setUserId] = useState(null);
-  const [tab, setTab] = useState("reserve");
+  const [me, setMe] = useState(null);
+  const [booting, setBooting] = useState(Boolean(getToken()));
+  const [tab, setTab] = useState(paymentReturn ? "mine" : "festivals");
+  const [festivalId, setFestivalId] = useState(null); // 예매 화면에서 보고 있는 축제
   const [version, setVersion] = useState(0);
   const [toast, setToast] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
   const [pending, setPending] = useState(0);
   useEffect(() => traceBus.subscribePending(setPending), []);
-
-  useEffect(() => {
-    api.users().then((list) => {
-      setUsers(list || []);
-      if (list?.length) selectUser(list[0].user_id);
-    }).catch(() => setToast({ tone: "bad", text: "백엔드(8000)에 연결할 수 없어요. 데모 서버를 먼저 실행하세요." }));
-  }, []);
-
-  function selectUser(id) {
-    setCurrentUser(id);
-    setUserId(id);
-    setVersion((v) => v + 1);
-  }
 
   function notify(tone, text) {
     setToast({ tone, text, at: Date.now() });
@@ -49,16 +47,75 @@ export default function App() {
   }, [toast]);
 
   const refresh = () => setVersion((v) => v + 1);
-  const me = users.find((u) => u.user_id === userId);
-  const admin = users.find((u) => u.role === "ADMIN");
 
-  async function reset() {
-    await api.reset();
-    notify("good", "데모 데이터를 초기화했어요 (잔여 100석, 예매 0건)");
+  function clearSession() {
+    setSession(null);
+    setMe(null);
+    setFestivalId(null);
+    setTab("festivals");
+  }
+
+  // 토큰으로 내 정보 조회 → 로그인 상태 확정
+  async function enter(token) {
+    setSession(token);
+    const user = await api.me();
+    setWho(user.name);
+    setMe(user);
+    return user;
+  }
+
+  // 처음 열 때 : 저장된 토큰이 있으면 로그인 복원, 결제창에서 돌아왔으면 승인까지 진행
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      clearSession();
+      notify("bad", "로그인이 만료됐어요. 다시 로그인해 주세요.");
+    });
+    (async () => {
+      if (!getToken()) return;
+      try {
+        await enter(getToken());
+      } catch {
+        clearSession();
+        return;
+      } finally {
+        setBooting(false);
+      }
+      if (paymentReturn) await finishPayment(paymentReturn);
+    })();
+  }, []);
+
+  // 결제창 인증 완료 → 서버 승인 API (이 안에서 토스 서버 호출)
+  async function finishPayment(ret) {
+    if (!ret.ok) {
+      notify("bad", `결제를 완료하지 못했어요 · ${ret.message || ret.code || ""}`);
+      return;
+    }
+    try {
+      const payment = await api.approvePayment(ret.paymentId, { payment_key: ret.paymentKey, amount: ret.amount });
+      if (payment.status === "DONE") {
+        notify("good", `결제 완료 · 예매 #${payment.reservation_id}`);
+      } else {
+        notify("good", `가상계좌 발급 완료 · 예매 #${payment.reservation_id} 입금 대기`);
+      }
+    } catch (e) {
+      notify("bad", `${e.status} ${e.code || ""} · ${e.message}`);
+    }
     refresh();
   }
 
+  async function logout() {
+    try {
+      await api.logout(); // 서버가 이 토큰을 차단 목록에 올린다
+    } catch {
+      /* 이미 만료된 토큰이어도 화면에서는 로그아웃 */
+    }
+    clearSession();
+  }
+
+
+
   const props = { version, notify };
+  const isAdmin = me?.role === "ADMIN";
 
   return (
     <div className={`app ${collapsed ? "wide" : ""}`}>
@@ -72,30 +129,40 @@ export default function App() {
             </div>
           </div>
           <div className="user-switch">
-            {users.map((u) => (
-              <button key={u.user_id} className={u.user_id === userId ? "on" : ""} onClick={() => selectUser(u.user_id)}>
-                {u.name}
-                {u.role === "ADMIN" && <span className="admin-dot">ADMIN</span>}
-              </button>
-            ))}
-            <button className="ghost small" onClick={reset} title="데모 데이터 초기화">↺ 초기화</button>
+            {me && (
+              <>
+                <span className="me-chip">
+                  {me.name}
+                  {isAdmin && <span className="admin-dot">ADMIN</span>}
+                </span>
+                <button className="ghost small" onClick={logout}>로그아웃</button>
+              </>
+            )}
           </div>
         </header>
 
-        <nav className="tabs">
-          {TABS.map(([k, label]) => (
-            <button key={k} className={tab === k ? "on" : ""} onClick={() => { setTab(k); refresh(); }}>
-              {label}
-            </button>
-          ))}
-          {me && <span className="as">현재 <b>{me.name}</b>(으)로 요청 중</span>}
-        </nav>
+        {me && (
+          <nav className="tabs">
+            {TABS.map(([k, label]) => (
+              <button key={k} className={tab === k ? "on" : ""} onClick={() => { setTab(k); if (k === "festivals") setFestivalId(null); refresh(); }}>
+                {label}
+              </button>
+            ))}
+            <span className="as">JWT 토큰으로 <b>{me.name}</b> 요청 중</span>
+          </nav>
+        )}
 
         <div className="content">
-          {userId && tab === "reserve" && <ReservePage {...props} onReserved={refresh} />}
-          {userId && tab === "mine" && <MyReservationsPage {...props} onChanged={refresh} adminId={admin?.user_id} />}
-          {userId && tab === "tickets" && <MyTicketsPage {...props} />}
-          {userId && tab === "admin" && <AdminPage {...props} isAdmin={me?.role === "ADMIN"} />}
+          {booting && <div className="page muted">로그인 확인 중…</div>}
+          {!booting && !me && <AuthPage notify={notify} onLogin={enter} />}
+          {me && tab === "festivals" && !festivalId && <FestivalsPage {...props} onSelect={setFestivalId} />}
+          {me && tab === "festivals" && festivalId && (
+            <ReservePage {...props} festivalId={festivalId} onBack={() => setFestivalId(null)} onReserved={() => { setTab("mine"); refresh(); }} />
+          )}
+          {me && tab === "mine" && <MyReservationsPage {...props} me={me} onChanged={refresh} />}
+          {me && tab === "tickets" && <MyTicketsPage {...props} />}
+          {me && tab === "profile" && <ProfilePage notify={notify} onUpdated={(u) => { setWho(u.name); setMe(u); }} />}
+          {me && tab === "admin" && <AdminPage {...props} festivalId={festivalId || 1} isAdmin={isAdmin} />}
         </div>
 
         {/* 떠 있는 팝업 : 내용을 밀지 않음 */}
