@@ -15,9 +15,15 @@ export default function PaymentsPage({ version, notify }) {
   const [holder, setHolder] = useState("");
 
   async function load() {
+    // 결제 목록 API는 reservation_id가 필수 → 내 예매마다 결제 목록을 받아 합친다
     try {
-      setList(await api.allPayments());
+      const reservations = await api.myReservations({ trace: false });
+      const lists = await Promise.all(
+        reservations.map((r) => api.payments(r.reservation_id).catch(() => [])),
+      );
+      setList(lists.flat().sort((a, b) => a.payment_id - b.payment_id));
     } catch (e) {
+      setList([]); // 실패해도 "불러오는 중"에 멈추지 않게
       notify("bad", `${e.status} ${e.message}`);
     }
   }
