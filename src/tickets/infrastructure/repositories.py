@@ -84,6 +84,10 @@ class SqlAlchemyTicketRepository(
             None if model is None else _to_domain(model)
         )  # DB행에서 도메인 ticket으로 변환
 
+    async def find_by_id(self, ticket_id: int) -> Ticket | None:
+        model = await self._session.get(TicketModel, ticket_id)
+        return None if model is None else _to_domain(model)
+
     async def save(self, ticket: Ticket) -> Ticket:
         if ticket.id is None:  # 새 티켓
             model = _to_model(ticket)

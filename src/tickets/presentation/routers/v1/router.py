@@ -133,14 +133,14 @@ async def get_entry_status(
 @router.get(
     "/{ticket_id}",
     response_model=APIResponse[TicketDetailResponse],
-    summary="내 티켓 상세 조회",
+    summary="티켓 상세 조회 (본인 또는 관리자)",
 )
-async def get_my_ticket(
+async def get_ticket(
     ticket_id: int,
     actor: Actor,
     service: Service,
 ):
-    ticket = await service.get_my_ticket(ticket_id, actor.user_id)
+    ticket = await service.get_ticket(ticket_id, actor.user_id, actor.is_admin)
     return APIResponse.ok(data=TicketDetailResponse.model_validate(ticket))
 
 
@@ -148,14 +148,14 @@ async def get_my_ticket(
 @router.patch(
     "/{ticket_id}/cancel",
     response_model=APIResponse[TicketCancelResponse],
-    summary="내 티켓 취소",
+    summary="티켓 단일 취소 (본인 또는 관리자)",
 )
 async def cancel_ticket(
     ticket_id: int,
     actor: Actor,
     service: Service,
 ):
-    result = await service.cancel_ticket(ticket_id, actor.user_id)
+    result = await service.cancel_ticket(ticket_id, actor.user_id, actor.is_admin)
     # 티켓 필드는 그대로 읽고, 함께 취소된 id 목록만 덧붙여서 응답을 만든다
     data = TicketCancelResponse.model_validate(
         SimpleNamespace(

@@ -26,6 +26,17 @@ export default function ReservePage({ festivalId, version, notify, onReserved, o
   const [qty, setQty] = useState(1);
   const [discount, setDiscount] = useState("NONE");
   const [busy, setBusy] = useState(false);
+  const [live, setLive] = useState({}); // performance_id → {detail, availability}
+
+  // 회차 상세 + 실시간 예매 가능 여부
+  async function check(id) {
+    try {
+      const [detail, availability] = await Promise.all([api.performance(id), api.availability(id)]);
+      setLive((cur) => ({ ...cur, [id]: { detail, availability } }));
+    } catch (e) {
+      notify("bad", `${e.status} ${e.code || ""} · ${e.message}`);
+    }
+  }
 
   useEffect(() => {
     api.festival(festivalId).then(setFestival).catch(() => {});
@@ -85,6 +96,14 @@ export default function ReservePage({ festivalId, version, notify, onReserved, o
                 </div>
               </div>
               <div className="perf-price">{won(p.price)}</div>
+              <button className="ghost small" onClick={() => check(p.performance_id)}>회차 상세 · 잔여 확인</button>
+              {live[p.performance_id] && (
+                <p className="hint">
+                  {live[p.performance_id].availability.is_bookable ? "지금 예매 가능" : "지금 예매 불가"} · 잔여 {live[p.performance_id].availability.remaining_count}석
+                  {" · "}예매 {fmtDate(live[p.performance_id].detail.booking_open_at)} ~ {fmtDate(live[p.performance_id].detail.booking_close_at)}
+                  {" · "}취소 마감 {fmtDate(live[p.performance_id].detail.cancel_deadline_at)}
+                </p>
+              )}
             </article>
           );
         })}

@@ -45,8 +45,14 @@ class TicketService:
         self._performance_repo = performance_repo  # 공연 정보 스냅샷
 
     # --------조회---------
-    async def get_my_ticket(self, ticket_id: int, user_id: int) -> Ticket:
-        ticket = await self._ticket_repo.find_by_id_for_user(ticket_id, user_id)
+    # 티켓 상세: 일반 회원은 본인 티켓만, 관리자는 전체 (남의 티켓은 404로 존재 숨김)
+    async def get_ticket(
+        self, ticket_id: int, user_id: int, is_admin: bool = False
+    ) -> Ticket:
+        if is_admin:
+            ticket = await self._ticket_repo.find_by_id(ticket_id)
+        else:
+            ticket = await self._ticket_repo.find_by_id_for_user(ticket_id, user_id)
         if ticket is None:
             raise TicketNotFound()
         return ticket
@@ -114,9 +120,11 @@ class TicketService:
     # - 토요일권·일요일권: 누른 1장 / 양일권: 토·일 한 쌍을 함께 취소
     # - 취소한 장마다 그 회차 잔여 수량 +1, 티켓이 전부 취소되면 예매도 CANCELED
     # - 결과에 함께 취소된 티켓 id를 담아 돌려준다 (양일권이면 짝 티켓 포함)
-    async def cancel_ticket(self, ticket_id: int, user_id: int) -> TicketCancelResult:
-        # ① 내 티켓인지 확인 (없거나 남의 티켓이면 404). 여기서는 예매 id를 알아내는 용도
-        ticket = await self.get_my_ticket(ticket_id, user_id)
+    async def cancel_ticket(
+        self, ticket_id: int, user_id: int, is_admin: bool = False
+    ) -> TicketCancelResult:
+        # ① 내 티켓인지 확인 (관리자는 예외, 없거나 남의 티켓이면 404). 예매 id를 알아내는 용도
+        ticket = await self.get_ticket(ticket_id, user_id, is_admin)
 
         # ② 같은 예매를 다루는 다른 요청이 끝날 때까지 기다린다
         await self._reservation_repo.lock(ticket.reservation_id)
