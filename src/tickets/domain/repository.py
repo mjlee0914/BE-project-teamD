@@ -26,11 +26,6 @@ class TicketRepository(ABC):
     async def find_by_id_for_user(self, ticket_id: int, user_id: int) -> Ticket | None:
         """본인 티켓만 조회한다. 없거나 남의 티켓이면 None."""
 
-    # 관리자용 티켓 조회 (소유자 무관)
-    @abstractmethod
-    async def find_by_id(self, ticket_id: int) -> Ticket | None:
-        """id로 티켓을 조회한다. 없으면 None."""
-
     # 중복발급 검사
     # 개수는 여기서 세고, 수량과 비교하는 판단은 유스케이스가 한다
     # @abstractmethod
