@@ -36,7 +36,7 @@ export default function AuthPage({ onLogin, notify }) {
   return (
     <div className="page auth">
       <section className="hero">
-        <div className="eyebrow">TEAMD FESTIVAL</div>
+        <div className="eyebrow">KANT ROCK FESTIVAL</div>
         <h1>{mode === "login" ? "로그인" : "회원가입"}</h1>
         <p className="muted">
           {mode === "login"
